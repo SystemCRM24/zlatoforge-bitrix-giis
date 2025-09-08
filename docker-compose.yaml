@@ -1,0 +1,19 @@
+x-app_environment: &app_environment
+  environment:
+    # Common
+    BITRIX_PORT: ${BITRIX_PORT}
+    CYPHER_PORT: ${CYPHER_PORT}
+    DEBUG: ${DEBUG}
+
+
+services:
+  bitrix:
+    restart: unless-stopped
+    ports:
+      - "${BITRIX_PORT}:8000"
+    volumes:
+      - ./bitrix/logs:/app/logs
+    build:
+      context: ./bitrix
+    command: uvicorn main:app --host 0.0.0.0
+    <<: *app_environment
