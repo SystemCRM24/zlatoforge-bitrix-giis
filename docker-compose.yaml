@@ -7,6 +7,18 @@ x-app_environment: &app_environment
 
 
 services:
+  cypher:
+    restart: unless-stopped
+    ports:
+      - "${CYPHER_PORT}:8000"
+    volumes:
+      - ./cypher/logs:/app/logs
+    build:
+      context: .
+      dockerfile: cypher/Dockerfile
+    command: uvicorn main:app --host 0.0.0.0
+    <<: *app_environment
+  
   bitrix:
     restart: unless-stopped
     ports:
@@ -17,3 +29,5 @@ services:
       context: ./bitrix
     command: uvicorn main:app --host 0.0.0.0
     <<: *app_environment
+    depends_on:
+      - cypher

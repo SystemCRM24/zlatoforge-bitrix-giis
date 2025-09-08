@@ -20,7 +20,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
 # Copy files to install CryptoPro
-COPY ../resources/dist /cprocsp
+COPY resources/dist /cprocsp
 WORKDIR /cprocsp
 
 # Install CryptoPro CSP and related packages
@@ -78,12 +78,11 @@ ENV LANG=C.UTF-8
 WORKDIR /app
 
 # Install uv and application dependencies
-COPY pyproject.toml uv.lock ./
+COPY cypher/pyproject.toml cypher/uv.lock .
 
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system .
+RUN pip install --no-cache-dir uv && uv pip install --system .
 
-COPY main.py ./
-COPY ./src ./src
+COPY cypher/main.py ./
+COPY cypher/src ./src
 
 EXPOSE 8000
