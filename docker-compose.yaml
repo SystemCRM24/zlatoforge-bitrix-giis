@@ -19,6 +19,7 @@ services:
       - "${STUNNEL_TEST}:1501"
     volumes:
       - ./cypher/logs:/app/logs
+      - ./cypher/src:/app/src
     build:
       context: .
       dockerfile: cypher/Dockerfile
