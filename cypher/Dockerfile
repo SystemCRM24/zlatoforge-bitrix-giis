@@ -20,13 +20,17 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
 # Copy files to install CryptoPro
-COPY resources/dist /cprocsp
+COPY ./cypher/assets /assets
 WORKDIR /cprocsp
 
 # Install CryptoPro CSP and related packages
-RUN set -ex && \
+RUN ln -s /assets/pycades.zip && \
+    ln -s /assets/linux-amd64_deb.tgz && \ 
+    ln -s /assets/cades-linux-amd64.tar.gz && \
+    set -ex && \
     tar xvf linux-amd64_deb.tgz && \
     ./linux-amd64_deb/install.sh && \
+    find ./linux-amd64_deb -name "cprocsp-stunnel-64_*.deb" | xargs apt-get install -y && \
     apt-get install ./linux-amd64_deb/lsb-cprocsp-devel_*.deb && \
     mkdir ./cades-linux-amd64 && \
     tar xvf cades-linux-amd64.tar.gz && \
@@ -47,17 +51,17 @@ COPY --from=build /cprocsp/pycades_*/pycades.so /usr/local/lib/python3.12/pycade
 COPY --from=build /opt/cprocsp /opt/cprocsp/
 COPY --from=build /var/opt/cprocsp /var/opt/cprocsp/
 COPY --from=build /etc/opt/cprocsp /etc/opt/cprocsp/
+COPY --from=build /assets /assets
 
 # Install packages for container operation
 RUN set -ex && \
     apt-get update && \
     apt-get install -y --no-install-recommends expect && \
+    apt-get install -y supervisor && \
+    apt-get install -y iproute2 && \
     apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy bash scripts and certificates
-# COPY scripts /scripts
-# COPY certificates /certificates
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /assets/start.sh
 
 # Create symbolic links for CryptoPro commands
 RUN cd /bin && \
@@ -71,18 +75,31 @@ RUN cd /bin && \
     ln -s /opt/cprocsp/bin/amd64/wipefile && \
     ln -s /opt/cprocsp/sbin/amd64/cpconfig
 
+# Copy certificates and install it
+COPY resources/certs /certs
+RUN set -ex && \
+    chmod +x /assets/install.sh && \
+    chmod +x /assets/start.sh && \
+    chmod +x /assets/scripts/* && \
+    chmod +x /assets/scripts/lib/* && \
+    /assets/install.sh
+
+# Setup Stunnel
+RUN mkdir -p /etc/opt/cprocsp/stunnel && \
+    ln -s /etc/opt/cprocsp/stunnel  /stunnel
+
 # Set up application environment
 ENV PYTHONUNBUFFERED=1
 ENV LANG=C.UTF-8
 
+# Install uv, application and application dependencies
 WORKDIR /app
 
-# Install uv and application dependencies
-COPY cypher/pyproject.toml cypher/uv.lock .
+COPY cypher/pyproject.toml cypher/uv.lock ./
 
 RUN pip install --no-cache-dir uv && uv pip install --system .
 
 COPY cypher/main.py ./
 COPY cypher/src ./src
 
-EXPOSE 8000
+EXPOSE 8000 1500 1501

@@ -1,9 +1,13 @@
 x-app_environment: &app_environment
   environment:
     # Common
-    BITRIX_PORT: ${BITRIX_PORT}
-    CYPHER_PORT: ${CYPHER_PORT}
     DEBUG: ${DEBUG}
+    # Bitrix
+    BITRIX_PORT: ${BITRIX_PORT}
+    # Cypher
+    CYPHER_PORT: ${CYPHER_PORT}
+    STUNNEL_WORK: ${STUNNEL_WORK}
+    STUNNEL_TEST: ${STUNNEL_TEST}
 
 
 services:
@@ -11,12 +15,14 @@ services:
     restart: unless-stopped
     ports:
       - "${CYPHER_PORT}:8000"
+      - "${STUNNEL_WORK}:1500"
+      - "${STUNNEL_TEST}:1501"
     volumes:
       - ./cypher/logs:/app/logs
     build:
       context: .
       dockerfile: cypher/Dockerfile
-    command: uvicorn main:app --host 0.0.0.0
+    command: ["/start.sh"]
     <<: *app_environment
   
   bitrix:
