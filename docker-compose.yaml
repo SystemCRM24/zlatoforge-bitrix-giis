@@ -6,8 +6,7 @@ x-app_environment: &app_environment
     BITRIX_PORT: ${BITRIX_PORT}
     # Cypher
     CYPHER_PORT: ${CYPHER_PORT}
-    STUNNEL_WORK: ${STUNNEL_WORK}
-    STUNNEL_TEST: ${STUNNEL_TEST}
+    STUNNEL_PORT: ${STUNNEL_PORT}
 
 
 services:
@@ -15,8 +14,7 @@ services:
     restart: unless-stopped
     ports:
       - "${CYPHER_PORT}:8000"
-      - "${STUNNEL_WORK}:1500"
-      - "${STUNNEL_TEST}:1501"
+      - "${STUNNEL_PORT}:1500"
     volumes:
       - ./cypher/logs:/app/logs
       - ./cypher/src:/app/src

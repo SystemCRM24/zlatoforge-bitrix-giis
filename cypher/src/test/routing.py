@@ -39,6 +39,7 @@ async def get_health_request() -> list:
 async def get_health_request1() -> str:
     """Сборный запрос к Health. 
     На проде будем использовать асинхронный клиент и править а править wsdl будем перед приемом вручную.
+    Если все удачно, вернет значение Running.
     """
     client = Client(wsdl="http://0.0.0.0:1500/ws/v3/exchange3.wsdl")
     binding_name = r'{urn://xsd.dmdk.goznak.ru/exchange/3.0}exchangeSoap11'
@@ -50,12 +51,9 @@ async def get_health_request1() -> str:
     }
     response = service.Health(
         TestMessage="test",
-        OGRN="1234567890123",   # ваш ОГРН
-        IDTOP="TOP123456789",   # ваш IDTOP
+        OGRN="1234567890123",
+        IDTOP="TOP123456789",
         agent="MyPythonApp v1.0",
         RequestData=health_request_data
     )
-    # Выводим результат
-    print("Результат:", response.ResponseData.Result)
-    print("ID запроса:", response.ResponseData.id)
-    return "success"
+    return response.ResponseData.Result

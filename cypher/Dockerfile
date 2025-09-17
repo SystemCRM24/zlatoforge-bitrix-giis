@@ -20,14 +20,11 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
 # Copy files to install CryptoPro
-COPY ./cypher/assets /assets
+COPY ./cypher/assets/cades /cprocsp
 WORKDIR /cprocsp
 
 # Install CryptoPro CSP and related packages
-RUN ln -s /assets/pycades.zip && \
-    ln -s /assets/linux-amd64_deb.tgz && \ 
-    ln -s /assets/cades-linux-amd64.tar.gz && \
-    set -ex && \
+RUN set -ex && \
     tar xvf linux-amd64_deb.tgz && \
     ./linux-amd64_deb/install.sh && \
     find ./linux-amd64_deb -name "cprocsp-stunnel-64_*.deb" | xargs apt-get install -y && \
@@ -51,7 +48,6 @@ COPY --from=build /cprocsp/pycades_*/pycades.so /usr/local/lib/python3.12/pycade
 COPY --from=build /opt/cprocsp /opt/cprocsp/
 COPY --from=build /var/opt/cprocsp /var/opt/cprocsp/
 COPY --from=build /etc/opt/cprocsp /etc/opt/cprocsp/
-COPY --from=build /assets /assets
 
 # Install packages for container operation
 RUN set -ex && \
@@ -60,8 +56,7 @@ RUN set -ex && \
     apt-get install -y supervisor && \
     apt-get install -y iproute2 && \
     apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -s /assets/start.sh
+    rm -rf /var/lib/apt/lists/* 
 
 # Create symbolic links for CryptoPro commands
 RUN cd /bin && \
@@ -77,9 +72,10 @@ RUN cd /bin && \
 
 # Copy certificates and install it
 COPY resources/certs /certs
+COPY ./cypher/assets/install.sh /assets/
+COPY ./cypher/assets/scripts /assets/scripts
 RUN set -ex && \
     chmod +x /assets/install.sh && \
-    chmod +x /assets/start.sh && \
     chmod +x /assets/scripts/* && \
     chmod +x /assets/scripts/lib/* && \
     /assets/install.sh
@@ -87,6 +83,12 @@ RUN set -ex && \
 # Setup Stunnel
 RUN mkdir -p /etc/opt/cprocsp/stunnel && \
     ln -s /etc/opt/cprocsp/stunnel  /stunnel
+COPY ./cypher/assets/stunnel.conf /assets
+
+# Setup Supervisor
+COPY ./cypher/assets/supervisord.conf /assets
+COPY ./cypher/assets/start.sh /
+RUN set -ex && chmod +x /start.sh
 
 # Set up application environment
 ENV PYTHONUNBUFFERED=1
@@ -96,9 +98,7 @@ ENV LANG=C.UTF-8
 WORKDIR /app
 
 COPY cypher/pyproject.toml cypher/uv.lock ./
-
-RUN pip install --no-cache-dir uv && uv pip install --system .
-
+RUN pip install --no-cache-dir uv && uv pip install --system --no-cache-dir .
 COPY cypher/main.py ./
 
 #COPY cypher/src ./src
