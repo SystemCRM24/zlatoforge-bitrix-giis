@@ -57,3 +57,21 @@ async def get_health_request1() -> str:
         RequestData=health_request_data
     )
     return response.ResponseData.Result
+
+
+@router.get('/health_compiled_async', status_code=200)
+async def get_health_request() -> str:
+    """Делает запрос при помощи асинхронного клиента, с передачей exchange напрямую"""
+    client = AsyncClient(wsdl="./src/exchange3.wsdl")
+    health_request_data = {
+        'DataForTest': 'Hello from my system!',
+        'id': 'req-12345-abcde'
+    }
+    response = await client.service.Health(
+        TestMessage="test",
+        OGRN="1234567890123",
+        IDTOP="TOP123456789",
+        agent="MyPythonApp v1.0",
+        RequestData=health_request_data
+    )
+    return response.ResponseData.Result
