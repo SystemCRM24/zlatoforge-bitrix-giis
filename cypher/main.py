@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 
 from src.common import router as common_router
-from src.test import router as test_router
+from src.test import router0 as test_router0
+from src.test import router1 as test_router1
 
 
 description = """Предоставляет методы для отправки и получения запросов в ГИИС ДМДК.
@@ -18,4 +19,5 @@ app = FastAPI(
     description=description
 )
 app.include_router(common_router)
-app.include_router(test_router)
+app.include_router(test_router0)
+app.include_router(test_router1)
