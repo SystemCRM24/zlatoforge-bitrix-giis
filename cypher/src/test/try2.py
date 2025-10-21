@@ -5,7 +5,7 @@ import pycades
 import base64
 
 
-router = APIRouter(prefix="/test", tags=['test1'])
+router = APIRouter(prefix="/try2")
 
 
 NSMAP = {
@@ -71,7 +71,10 @@ def insert_sign(template):
         exclusive=True,
         with_comments=False
     )
-    data_to_sign = base64.b64encode(data).decode('utf-8')
+
+    # data_to_sign = base64.b64encode(data).decode('utf-8')
+    data_to_sign = data.decode('utf-8')
+    print(data, '\n ', data_to_sign)
 
     insert_hash_and_signature(template, data_to_sign)
     insert_key_info(template, data_to_sign)
