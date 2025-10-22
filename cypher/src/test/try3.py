@@ -10,6 +10,8 @@ router = APIRouter(prefix="/try3")
 
 @router.get('/build_message_ai', status_code=200)
 async def build_message() -> list[str]:
+    check_embedded_license()
+
     template = build_template()
     insert_sign(template)
 
@@ -182,3 +184,118 @@ def insert_certificate_info(signature_element, cert):
     x509_data = etree.SubElement(key_info, f'{{{DSMAP["ds"]}}}X509Data')
     x509_certificate = etree.SubElement(x509_data, f'{{{DSMAP["ds"]}}}X509Certificate')
     x509_certificate.text = cert.Export(pycades.CAPICOM_ENCODE_BASE64).replace('\n', '')
+
+
+def insert_sign(template):
+    request_data = template.find(f'.//{{{NSMAP["ns"]}}}RequestData[@id="body"]')
+    
+    # Сериализуем исходные данные (без преобразований)
+    original_data = etree.tostring(request_data, encoding='utf-8')
+    
+    # Вычисляем DigestValue от исходных данных
+    # Преобразования будут указаны в Transforms и применены при проверке
+    store = pycades.Store()
+    store.Open(pycades.CADESCOM_CONTAINER_STORE, pycades.CAPICOM_MY_STORE, pycades.CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+    certs = store.Certificates
+    assert certs.Count != 0, "Certificates with private key not found"
+    
+    hashed_data = pycades.HashedData()
+    hashed_data.Algorithm = pycades.CADESCOM_HASH_ALGORITHM_CP_GOST_3411_2012_256
+    hashed_data.DataEncoding = pycades.CADESCOM_BASE64_TO_BINARY
+    hashed_data.Hash(base64.b64encode(original_data).decode('utf-8'))
+    
+    hash_bytes = bytes.fromhex(hashed_data.Value)
+    hash_base64 = base64.b64encode(hash_bytes).decode('utf-8')
+    
+    insert_signature_block(template, hash_base64)
+
+def insert_signature_block(template, digest_value):
+    caller_signature = template.find(f'.//{{{NSMAP["ns"]}}}CallerSignature')
+    signature = etree.SubElement(caller_signature, f'{{{DSMAP["ds"]}}}Signature', nsmap=DSMAP)
+
+    signed_info = etree.SubElement(signature, f'{{{DSMAP["ds"]}}}SignedInfo')
+
+    # CanonicalizationMethod
+    etree.SubElement(signed_info, f'{{{DSMAP["ds"]}}}CanonicalizationMethod', 
+                    Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+    
+    # SignatureMethod
+    etree.SubElement(signed_info, f'{{{DSMAP["ds"]}}}SignatureMethod', 
+                    Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256")
+    
+    # Reference
+    reference = etree.SubElement(signed_info, f'{{{DSMAP["ds"]}}}Reference', URI="#body")
+    transforms = etree.SubElement(reference, f'{{{DSMAP["ds"]}}}Transforms')
+    
+    # Указываем преобразования в правильном порядке
+    etree.SubElement(transforms, f'{{{DSMAP["ds"]}}}Transform', 
+                    Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+    etree.SubElement(transforms, f'{{{DSMAP["ds"]}}}Transform', 
+                    Algorithm="urn://smev-gov-ru/xmldsig/transform")
+    
+    # DigestMethod
+    etree.SubElement(reference, f'{{{DSMAP["ds"]}}}DigestMethod', 
+                    Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256")
+    
+    # DigestValue (от исходных данных)
+    digest_element = etree.SubElement(reference, f'{{{DSMAP["ds"]}}}DigestValue')
+    digest_element.text = digest_value
+
+    store = pycades.Store()
+    store.Open(pycades.CADESCOM_CONTAINER_STORE, pycades.CAPICOM_MY_STORE, pycades.CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+    certs = store.Certificates
+    assert certs.Count != 0, "Certificates with private key not found"
+
+    # Подписываем SignedInfo
+    signer = pycades.Signer()
+    signer.Certificate = certs.Item(1)
+    signer.CheckCertificate = True
+
+    signed_info_c14n = etree.tostring(signed_info, method='c14n', exclusive=True)
+    signed_info_b64 = base64.b64encode(signed_info_c14n).decode('utf-8')
+    
+    signed_data = pycades.SignedData()
+    hashed_signed_info = pycades.HashedData()
+    hashed_signed_info.Algorithm = pycades.CADESCOM_HASH_ALGORITHM_CP_GOST_3411_2012_256
+    hashed_signed_info.DataEncoding = pycades.CADESCOM_BASE64_TO_BINARY
+    hashed_signed_info.Hash(signed_info_b64)
+    
+    signature_bytes = signed_data.SignHash(hashed_signed_info, signer, pycades.CADESCOM_CADES_BES, True)
+    signature_b64 = base64.b64encode(signature_bytes).decode('utf-8')
+
+    signature_value = etree.SubElement(signature, f'{{{DSMAP["ds"]}}}SignatureValue')
+    signature_value.text = signature_b64
+
+    insert_certificate_info(signature, certs.Item(1))
+
+
+def check_embedded_license():
+    store = pycades.Store()
+    store.Open(pycades.CADESCOM_CONTAINER_STORE, pycades.CAPICOM_MY_STORE, pycades.CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+    
+    certs = store.Certificates
+    if certs.Count == 0:
+        print("Сертификаты не найдены")
+        return
+    
+    cert = certs.Item(1)
+    print(f"Сертификат: {cert.SubjectName}")
+    print(f"Серийный номер: {cert.SerialNumber}")
+    
+    # Проверяем расширения
+    oid = "1.2.643.2.2.49.2"  # Example OID for an embedded license
+    if cert.HasExtension(oid):
+        extension_value = cert.GetExtensionValue(oid)
+        print(extension_value)
+    # extensions = cert.Extensions
+    # for j in range(extensions.Count):
+    #     ext = extensions.Item(j)
+    #     if "1.2.643.2.2.49.2" in ext.OID or "встроенная лицензия" in ext.Name.lower():
+    #         print("✅ Найдена встроенная лицензия!")
+    #         print(f"Расширение: {ext.Name}")
+    #         print(f"OID: {ext.OID}")
+    #         print(f"Данные: {ext.Value}")
+    #         return
+    
+    print("❌ Встроенная лицензия не найдена в этом сертификате\n")
+
