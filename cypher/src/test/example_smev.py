@@ -106,7 +106,7 @@ def example(xml_file: str):
 
     signature_value_node.text = signatureValue
 
-    tree.write(xml_file, encoding="utf-8", xml_declaration=True, pretty_print=True)
+    tree.write(xml_file, encoding="utf-8", xml_declaration=True)
 
     # with open("signed.xml", "r") as f:
     #     final_xml = f.read()

@@ -21,7 +21,7 @@ async def build_message() -> list[str]:
     insert_sign(template)
 
     with open('/app/logs/request.xml', mode='wb') as file:
-        file.write(etree.tostring(template, pretty_print=True, encoding='utf-8'))
+        file.write(etree.tostring(template, pretty_print=False, encoding='utf-8'))
 
     template_str = etree.tostring(template, encoding='utf-8')
     client = Client('./src/exchange3.wsdl')
@@ -142,9 +142,9 @@ def insert_key_info(request, data_to_sign):
     data_signature = signed_data.SignHash(hashed_data, signer, pycades.CADESCOM_CADES_BES, True)
     data_signature = base64.b64encode(data_signature).decode('utf-8')
  
-    signature = request.find(f'.//{{{DSMAP["ds"]}}}Signature')
-    signature_value = etree.SubElement(signature, f'{{{DSMAP["ds"]}}}SignatureValue')
-    signature_value.text = data_signature
+    # signature = request.find(f'.//{{{DSMAP["ds"]}}}Signature')
+    # signature_value = etree.SubElement(signature, f'{{{DSMAP["ds"]}}}SignatureValue')
+    # signature_value.text = data_signature
 
 
 def insert_certificate_info(request):
