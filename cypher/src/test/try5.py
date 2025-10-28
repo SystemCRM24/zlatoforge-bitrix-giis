@@ -4,6 +4,7 @@ from lxml import etree
 from src.libs import GOSTXMLTransform
 import base64
 from zeep import Client
+from .example_smev import example
 
 
 class Signer:
@@ -39,14 +40,14 @@ async def build_message() -> list[str]:
     sign_ref_element(template)
     insert_key_info(template)
 
-    template.getroottree().write(
-        '/app/logs/request.xml', 
-        encoding="utf-8", 
-        xml_declaration=True,
-        pretty_print=True
-    )
+    xml_document = '/app/logs/request.xml'
 
-    with open('/app/logs/request.xml', encoding='utf-8') as file:
+    with open(xml_document, mode='wb') as file:
+        file.write(etree.tostring(template))
+
+    example(xml_document)
+
+    with open('/app/logs/request.xml') as file:
         template_str = file.read()
 
     client = Client('./src/exchange3.wsdl')
