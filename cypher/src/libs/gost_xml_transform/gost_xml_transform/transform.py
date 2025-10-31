@@ -115,7 +115,6 @@ class XMLNode:
             for attrib in self.element.attrib.keys()
             if etree.QName(attrib).namespace
         }
-
         for uri, _ in sorted(ns_from_attrib, key=lambda x: (x[0], x[1])):
             if uri is not None:
                 self.get_ns(uri)
