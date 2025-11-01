@@ -5,7 +5,6 @@ import pycades
 import base64
 from src.libs import GOSTXMLTransform
 from zeep import Client
-import re
 
 
 class XMLTemplate:

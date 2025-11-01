@@ -20,7 +20,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
 # Copy files to install CryptoPro
-COPY ./cypher/assets/cades /cprocsp
+COPY ./assets/cades /cprocsp
 WORKDIR /cprocsp
 
 # Install CryptoPro CSP and related packages
@@ -71,9 +71,9 @@ RUN cd /bin && \
     ln -s /opt/cprocsp/sbin/amd64/cpconfig
 
 # Copy certificates and install it
-COPY resources/certs /certs
-COPY ./cypher/assets/install.sh /assets/
-COPY ./cypher/assets/scripts /assets/scripts
+COPY ./certs /certs
+COPY ./assets/install.sh /assets/
+COPY ./assets/scripts /assets/scripts
 RUN set -ex && \
     chmod +x /assets/install.sh && \
     chmod +x /assets/scripts/* && \
@@ -83,11 +83,11 @@ RUN set -ex && \
 # Setup Stunnel
 RUN mkdir -p /etc/opt/cprocsp/stunnel && \
     ln -s /etc/opt/cprocsp/stunnel  /stunnel
-COPY ./cypher/assets/stunnel.conf /assets
+COPY ./assets/stunnel.conf /assets
 
 # Setup Supervisor
-COPY ./cypher/assets/supervisord.conf /assets
-COPY ./cypher/assets/start.sh /
+COPY ./assets/supervisord.conf /assets
+COPY ./assets/start.sh /
 RUN set -ex && chmod +x /start.sh
 
 # Set up application environment
@@ -97,9 +97,9 @@ ENV LANG=C.UTF-8
 # Install uv, application and application dependencies
 WORKDIR /app
 
-COPY cypher/pyproject.toml cypher/uv.lock ./
+COPY ./pyproject.toml ./uv.lock ./
 RUN pip install --no-cache-dir uv && uv pip install --system --no-cache-dir .
-COPY cypher/main.py ./
+COPY ./main.py ./
 
 #COPY cypher/src ./src
 
