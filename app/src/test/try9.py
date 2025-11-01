@@ -234,7 +234,7 @@ async def build_message() -> list[str]:
     with open('/app/logs/request.xml', mode='wb') as file:
         file.write(message.to_bytes(True))
     
-    client = Client('./src/exchange3.wsdl')
+    client = Client('./logs/exchange3.wsdl')
     with client.settings(raw_response=True):
         response = client.transport.post(
             address='http://0.0.0.0:1500/ws/v3/',
