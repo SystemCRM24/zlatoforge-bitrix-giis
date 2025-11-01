@@ -1,5 +1,5 @@
 import requests
-from lxml import etree
+from lxml import etree      #type:ignore
 from io import BytesIO
 from pathlib import Path
 from src.utils import logger

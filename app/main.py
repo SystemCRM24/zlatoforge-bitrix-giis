@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.common import router as common_router
-from src.test import router as test_router
+from src._examples import router as test_router
 from src.services import on_startup
 
 
@@ -28,7 +27,11 @@ app.add_middleware(
 )
 app.add_event_handler('startup', on_startup)
 
+# роуты
+app.include_router(test_router) # Оставлю тут тестовые роутеры, как напоминания о страданиях))
 
-app.include_router(common_router)
-# Оставлю тут тестовые роутеры, как напоминания о страданиях))
-app.include_router(test_router)
+
+@app.get('/ping', status_code=200)
+async def ping() -> str:
+    """pong da best"""
+    return 'Pong'

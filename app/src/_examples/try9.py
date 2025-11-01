@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 from typing import Self
-from lxml import etree
-import pycades
+from lxml import etree      # type:ignore
+import pycades              # type:ignore
 import base64
-from src.libs import GOSTXMLTransform
+from src.xml_schemas.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
 from zeep import Client
 
 
@@ -166,9 +166,9 @@ class SignedXMLTemplate(XMLTemplate):
         hashedData.DataEncoding = pycades.CADESCOM_BASE64_TO_BINARY
         hashedData.Hash(base64.b64encode(transformed_reference).decode())
         hash_value_b64 = base64.b64encode(bytearray.fromhex(hashedData.Value)).decode()
-        self._digest_value_node.text = hash_value_b64
+        self._digest_value_node.text = hash_value_b64                   # type:ignore
         # Генерим подпись от посчитанного хеша
-        signed_info_node = self._root_node.find(".//ds:SignedInfo", namespaces=self.DSMAP)
+        signed_info_node = self._root_node.find(".//ds:SignedInfo", namespaces=self.DSMAP)  # type:ignore
         c14n_signed_info = etree.tostring(
             signed_info_node,
             method="c14n",
@@ -183,7 +183,7 @@ class SignedXMLTemplate(XMLTemplate):
         signature_hex: str = signed_data.SignHash(hashedData, self.CERT)
         inverted_signature_bytes = bytearray(reversed(bytearray.fromhex(signature_hex)))
         signature_base64 = base64.b64encode(inverted_signature_bytes).decode('utf-8')
-        self._signature_value_node.text = signature_base64
+        self._signature_value_node.text = signature_base64  # type:ignore
     
     def _transform_reference(self) -> bytes:
         """Трансформ референса. Сначало смэв, потом с14n."""

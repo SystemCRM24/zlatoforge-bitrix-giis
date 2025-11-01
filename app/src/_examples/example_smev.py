@@ -2,7 +2,7 @@ from lxml import etree
 import base64
 import pycades
 # from gost_xml_transform import GOSTXMLTransfosrcrm
-from src.libs import GOSTXMLTransform
+from src.xml_schemas.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
 
 
 

@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 import pycades
 from lxml import etree
-from src.libs import GOSTXMLTransform
+from src.xml_schemas.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
 import base64
 from zeep import Client
+from .example_smev import example
 
 
 class Signer:
@@ -29,37 +30,27 @@ class Signer:
         pass
 
 
-router = APIRouter(prefix="/try4")
+router = APIRouter(prefix="/try5")
 
 
 @router.get('/build_message', status_code=200)
 async def build_message() -> list[str]:
     """Тестим, тестим"""
     template = build_template()
-    digest_value = sign_ref_element(template)
-    insert_digest_value(template, digest_value)
-    sign_signed_info(template)
+    sign_ref_element(template)
     insert_key_info(template)
 
-    template.getroottree().write(
-        '/app/logs/request.xml', 
-        encoding="utf-8", 
-        xml_declaration=True,
-        pretty_print=True
-    )
+    xml_document = '/app/logs/request.xml'
 
-    with open('/app/logs/request.xml', encoding='utf-8') as file:
+    with open(xml_document, mode='wb') as file:
+        file.write(etree.tostring(template))
+
+    example(xml_document)
+
+    with open('/app/logs/request.xml') as file:
         template_str = file.read()
 
     client = Client('./src/exchange3.wsdl')
-
-    # Получить endpoint из WSDL
-    service = client.wsdl
-    print(dir(service))
-    print(service.services)
-    # port = service.ports[0]
-    # endpoint_from_wsdl = port.binding_options['address']
-
     with client.settings(raw_response=True):
         response = client.transport.post(
             address='http://0.0.0.0:1500/ws/v3/',
@@ -80,7 +71,7 @@ async def build_message() -> list[str]:
 
 NSMAP = {
     'soapenv': 'http://schemas.xmlsoap.org/soap/envelope/',
-    'ns1': 'urn://xsd.dmdk.goznak.ru/exchange/3.0'
+    'ns': 'urn://xsd.dmdk.goznak.ru/exchange/3.0'
 }
 DSMAP = {'ds': "http://www.w3.org/2000/09/xmldsig#"}
 
@@ -90,15 +81,15 @@ def build_template():
     header = etree.SubElement(root, f'{{{NSMAP["soapenv"]}}}Header')
     body = etree.SubElement(root, f'{{{NSMAP["soapenv"]}}}Body')
 
-    request = etree.SubElement(body, f'{{{NSMAP["ns1"]}}}SendGetGlossaryRequest')
-    caller_signature = etree.SubElement(request, f'{{{NSMAP["ns1"]}}}CallerSignature')
+    request = etree.SubElement(body, f'{{{NSMAP["ns"]}}}SendGetGlossaryRequest')
+    caller_signature = etree.SubElement(request, f'{{{NSMAP["ns"]}}}CallerSignature')
 
-    request_data = etree.SubElement(request, f'{{{NSMAP["ns1"]}}}RequestData', id='body')
-    _type = etree.SubElement(request_data, f'{{{NSMAP["ns1"]}}}type')
+    request_data = etree.SubElement(request, f'{{{NSMAP["ns"]}}}RequestData', id='body')
+    _type = etree.SubElement(request_data, f'{{{NSMAP["ns"]}}}type')
     _type.text = 'GEMSTONE_COLOR_TYPE'
-    page = etree.SubElement(request_data, f'{{{NSMAP["ns1"]}}}page')
+    page = etree.SubElement(request_data, f'{{{NSMAP["ns"]}}}page')
     page.text = '1'
-    size = etree.SubElement(request_data, f'{{{NSMAP["ns1"]}}}size')
+    size = etree.SubElement(request_data, f'{{{NSMAP["ns"]}}}size')
     size.text = '25'
 
     return root
@@ -106,7 +97,7 @@ def build_template():
 
 def sign_ref_element(template):
     """Возвращает digest_value"""
-    ref_element = template.find(f'.//{{{NSMAP["ns1"]}}}RequestData')
+    ref_element = template.find(f'.//{{{NSMAP["ns"]}}}RequestData')
 
     c14n_bytes = etree.tostring(
         ref_element,
@@ -125,11 +116,9 @@ def sign_ref_element(template):
     hashedData.DataEncoding = pycades.CADESCOM_BASE64_TO_BINARY
     hashedData.Hash(b64_transformed_bytes)
 
-    return base64.b64encode(bytearray.fromhex(hashedData.Value)).decode()
+    digest_value = base64.b64encode(bytearray.fromhex(hashedData.Value)).decode()
 
-
-def insert_digest_value(template, digest_value):
-    caller_signature = template.find(f'.//{{{NSMAP["ns1"]}}}CallerSignature')
+    caller_signature = template.find(f'.//{{{NSMAP["ns"]}}}CallerSignature')
     signature = etree.SubElement(caller_signature, f'{{{DSMAP["ds"]}}}Signature', nsmap=DSMAP)
 
     signed_info = etree.SubElement(signature, f'{{{DSMAP["ds"]}}}SignedInfo')
@@ -148,23 +137,13 @@ def insert_digest_value(template, digest_value):
 
     digest_value_el.text = digest_value
 
+    signed_data = pycades.SignedData()
+    data_signature = signed_data.SignHash(hashedData, Signer.SIGNER, pycades.CADESCOM_CADES_BES, True)
+    data_signature = base64.b64encode(data_signature).decode('utf-8')
 
-def sign_signed_info(template):
-    signed_info_node = template.find(f'.//{{{DSMAP["ds"]}}}SignedInfo')
-    c14n_signed_info = etree.tostring(
-        signed_info_node,
-        method="c14n",
-        exclusive=True,
-        with_comments=False
-    )
-    signedData = pycades.SignedData()
-    signedData.ContentEncoding = pycades.CADESCOM_BASE64_TO_BINARY
-    signedData.Content = base64.b64encode(c14n_signed_info).decode()
-    signature = signedData.SignCades(Signer.SIGNER, pycades.CADESCOM_CADES_BES, True)
-    signatureValue =  base64.b64encode(base64.b64decode(signature)).decode()
     signature_node = template.find(f'.//{{{DSMAP["ds"]}}}Signature')
     signature_value_node = etree.SubElement(signature_node, f'{{{DSMAP["ds"]}}}SignatureValue')
-    signature_value_node.text = signatureValue
+    signature_value_node.text = data_signature
 
 
 def insert_key_info(request):

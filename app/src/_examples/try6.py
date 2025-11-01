@@ -3,7 +3,7 @@ from typing import Self
 from lxml import etree
 import pycades
 import base64
-from src.libs import GOSTXMLTransform
+from src.xml_schemas.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
 from zeep import Client
 
 
@@ -73,7 +73,7 @@ class XMLTemplate:
         body = etree.SubElement(root, f'{soapenv_prefix}Body')
         # Наполняем тело сообщения
         request = etree.SubElement(body, f'{ns_prefix}{self.__class__.__name__}')
-        self._caller_signature_node = etree.SubElement(request, f'{ns_prefix}Signature')
+        self._caller_signature_node = etree.SubElement(request, f'{ns_prefix}CallerSignature')
         self._request_data_node = etree.SubElement(request, f'{ns_prefix}RequestData', id=self.request_data_tag)
     
     def _fill_request_node(self, parent_node, request_data: dict[str, dict]):
@@ -132,8 +132,7 @@ class SignedXMLTemplate(XMLTemplate):
     def _create_signature_node(self):
         """Собирает ветку CallerSignature"""
         ds_prefix = f'{{{self.DSMAP['ds']}}}'
-        # signature = etree.SubElement(self._caller_signature_node, f'{ds_prefix}Signature', nsmap=self.DSMAP)
-        signature = self._caller_signature_node
+        signature = etree.SubElement(self._caller_signature_node, f'{ds_prefix}Signature', nsmap=self.DSMAP)
         # Информация о подписи
         signed_info = etree.SubElement(signature, f'{ds_prefix}SignedInfo')
         etree.SubElement(signed_info, f'{ds_prefix}CanonicalizationMethod', Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
@@ -143,39 +142,36 @@ class SignedXMLTemplate(XMLTemplate):
         # Применяемые трансформы над референсом (RequestData)
         transforms = etree.SubElement(reference, f'{ds_prefix}Transforms')
         etree.SubElement(transforms, f'{ds_prefix}Transform', Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
-        # etree.SubElement(transforms, f'{ds_prefix}Transform', Algorithm="urn://smev-gov-ru/xmldsig/transform")
+        etree.SubElement(transforms, f'{ds_prefix}Transform', Algorithm="urn://smev-gov-ru/xmldsig/transform")
         # Метод и значение хеш-суммы вычисленное от референса
         etree.SubElement(reference, f'{ds_prefix}DigestMethod', Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256")
         self._digest_value_node = etree.SubElement(reference, f'{ds_prefix}DigestValue')
-        # self._digest_value_node.text = ""
+        self._digest_value_node.text = ""
         # Значение подписи.
         self._signature_value_node = etree.SubElement(signature, f'{ds_prefix}SignatureValue')
-        # self._signature_value_node.text = ""
+        self._signature_value_node.text = ""
         # Ветка для ключа
         key_info = etree.SubElement(signature, f'{ds_prefix}KeyInfo')
-        # x509_data = etree.SubElement(key_info, f'{ds_prefix}X509Data')
-        # self._cert_node = etree.SubElement(x509_data, f'{ds_prefix}X509Certificate')
+        x509_data = etree.SubElement(key_info, f'{ds_prefix}X509Data')
+        self._cert_node = etree.SubElement(x509_data, f'{ds_prefix}X509Certificate')
         # Сразу помещаем данные сертификата в сообщение
-        # self._cert_node.text = self.CERT.Export(pycades.CADESCOM_ENCODE_BASE64)
+        self._cert_node.text = self.CERT.Export(pycades.CADESCOM_ENCODE_BASE64)
     
     def _sign_reference(self):
         """Подписываем референс"""
         transformed_reference = self._transform_reference()
-        print(transformed_reference)
         # Считаем хеш
-        signedData = pycades.SignedData()
-        # signedData.ContentEncoding = pycades.CADESCOM_BASE64_TO_BINARY
-        # signedData.Content = base64.b64encode(transformed_reference).decode()
-        # signature = signedData.SignCades(self.SIGNER, pycades.CADESCOM_XMLDSIG_TYPE, True)
-        # data_signature_b64 = base64.b64encode(base64.b64decode(signature)).decode()
-        signedXML = pycades.SignedXML()
-        signedXML.Content = transformed_reference
-        signedXML.DigestMethod = pycades.XmlDsigGost3411Url2012256
-        signedXML.SignatureMethod = pycades.XmlDsigGost3410Url2012256
-        signed = signedXML.Sign(self.SIGNER)
-        print(signed)
-        # print(signed)        
-
+        hashedData = pycades.HashedData()
+        hashedData.Algorithm = pycades.CADESCOM_HASH_ALGORITHM_CP_GOST_3411_2012_256
+        hashedData.DataEncoding = pycades.CADESCOM_BASE64_TO_BINARY
+        hashedData.Hash(base64.b64encode(transformed_reference).decode())
+        hash_value_b64 = base64.b64encode(bytearray.fromhex(hashedData.Value)).decode()
+        self._digest_value_node.text = hash_value_b64
+        # Генерим подпись от посчитанного хеша
+        signed_data = pycades.SignedData()
+        data_signature = signed_data.SignHash(hashedData, self.SIGNER, pycades.CADESCOM_CADES_BES, True)
+        data_signature_b64 = base64.b64encode(data_signature).decode('utf-8')
+        self._signature_value_node.text = data_signature_b64
     
     def _transform_reference(self) -> bytes:
         """Трансформ референса. Сначало смэв, потом с14n."""
@@ -195,14 +191,14 @@ class SignedXMLTemplate(XMLTemplate):
             exclusive=True, 
             with_comments=False, 
             inclusive_ns_prefixes=None
-        ).decode()
+        )
 
 
 class SendGetGlossaryRequest(SignedXMLTemplate):
     """Используется для получения элементов справочника."""
 
 
-router = APIRouter(prefix='/try8')
+router = APIRouter(prefix='/try6')
 
 
 @router.get("/build_message")
@@ -213,9 +209,10 @@ async def build_message() -> list[str]:
         'size': {'ns': 'ns', 'value': 25}
     }
     message = SendGetGlossaryRequest.from_dict(request_data)
+
     with open('/app/logs/request.xml', mode='wb') as file:
         file.write(message.to_bytes(True))
-
+    
     client = Client('./src/exchange3.wsdl')
     with client.settings(raw_response=True):
         response = client.transport.post(
@@ -223,10 +220,13 @@ async def build_message() -> list[str]:
             message=message.to_string(),
             headers={'Content-Type': 'text/xml; charset=utf-8'}
         )
+
     decoded = response.content.decode('utf-8')
     response = [str(response)]
     pp = etree.tostring(etree.fromstring(decoded), pretty_print=True, encoding='unicode')
+    
     with open('/app/logs/response.xml', mode='w', encoding='utf-8') as file:
         file.writelines(pp)
+
     response.extend(pp.split('\n'))
     return response
