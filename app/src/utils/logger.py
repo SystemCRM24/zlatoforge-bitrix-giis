@@ -1,5 +1,7 @@
-from loguru import logger
 import sys
+
+from loguru import logger
+
 from src.core import settings
 
 
@@ -15,8 +17,8 @@ debug_template = (
 # Основной логгер
 logger.add(
     sys.stdout,
-    level='DEBUG' if settings.DEBUG else 'INFO',
+    level="DEBUG" if settings.DEBUG else "INFO",
     format=debug_template,
-    filter=lambda r: r['level'].no < logger.level('CRITICAL').no,
-    enqueue=True
+    filter=lambda r: r["level"].no < logger.level("CRITICAL").no,
+    enqueue=True,
 )

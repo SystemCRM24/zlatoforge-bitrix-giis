@@ -14,9 +14,7 @@ description = """Предоставляет методы для отправки
 """
 
 app = FastAPI(
-    title='Cypher',
-    summary='Интерфейс для отправки SOAP-запросов в ГИИС.',
-    description=description
+    title="Cypher", summary="Интерфейс для отправки SOAP-запросов в ГИИС.", description=description
 )
 app.add_middleware(
     CORSMiddleware,
@@ -25,13 +23,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_event_handler('startup', on_startup)
+app.add_event_handler("startup", on_startup)
 
 # роуты
-app.include_router(test_router) # Оставлю тут тестовые роутеры, как напоминания о страданиях))
+app.include_router(test_router)  # Оставлю тут тестовые роутеры, как напоминания о страданиях))
 
 
-@app.get('/ping', status_code=200)
+@app.get("/ping", status_code=200)
 async def ping() -> str:
     """pong da best"""
-    return 'Pong'
+    return "Pong"
