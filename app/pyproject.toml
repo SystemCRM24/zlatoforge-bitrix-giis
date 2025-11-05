@@ -12,3 +12,29 @@ dependencies = [
     "uvicorn>=0.35.0",
     "zeep[async]>=4.3.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.3",
+]
+
+[tool.ruff]
+line-length = 100
+preview = true
+lint.select = ["E", "F", "W", "UP", "I", "TID25", "D101", "D102", "D103", "D107", "T201"]
+lint.extend-select = ["E302", "E305", "E306"]
+lint.extend-fixable = ["E302", "E305", "E306"]
+
+[tool.ruff.lint.isort]
+detect-same-package = false
+lines-after-imports = 2
+split-on-trailing-comma=false
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # ignore unused imports in __init__.py
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+skip-magic-trailing-comma = true
+line-ending = "cr-lf"
