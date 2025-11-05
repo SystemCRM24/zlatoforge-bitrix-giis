@@ -20,10 +20,11 @@ dev = [
 
 [tool.ruff]
 include = ["main.py", "src/**/*.py", "pyproject.toml"]
-extend-exclude = ["src/_examples", "src/xml_schemas/gost_xml_transform"]
+extend-exclude = ["src/_examples", "src/xml_schemas/base/gost_xml_transform"]
 line-length = 100
 preview = true
 lint.select = ["E", "F", "W", "UP", "I", "TID25", "D101", "D102", "D103", "D107", "T201"]
+lint.ignore = ["D107"]
 lint.extend-select = ["E302", "E305", "E306"]
 lint.extend-fixable = ["E302", "E305", "E306"]
 
