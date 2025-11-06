@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src._examples import router as test_router
+from src.api import router as api_router
 from src.services import on_startup
 
 
@@ -26,6 +27,7 @@ app.add_middleware(
 app.add_event_handler("startup", on_startup)
 
 # роуты
+app.include_router(api_router)
 app.include_router(test_router)  # Оставлю тут тестовые роутеры, как напоминания о страданиях))
 
 

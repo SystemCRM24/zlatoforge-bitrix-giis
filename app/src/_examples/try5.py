@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 import pycades
 from lxml import etree
-from src.xml_schemas.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
+from src.xml_handlers.base.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
 import base64
 from zeep import Client
 from .example_smev import example

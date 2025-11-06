@@ -1,6 +1,5 @@
 # pylint: disable=C0116,C0115,C0114
 import pytest
-
 from gost_xml_transform import GOSTXMLTransform
 
 

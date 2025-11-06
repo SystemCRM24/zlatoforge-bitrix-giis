@@ -1,6 +1,5 @@
 # pylint: disable=C0116,C0115,C0114,R0402
 from io import BytesIO
-from typing import Optional, Tuple
 
 import lxml.etree as etree
 
@@ -45,10 +44,10 @@ class XMLNode:
         self.qname = etree.QName(element.tag)
         self.nsmap: dict = {}
         self.attrib: list = []
-        self.prefix: Optional[str] = None
+        self.prefix: str | None = None
         self._parse_nsmap()
         self._parse_attrib()
-        self.children: Tuple['XMLNode', ...] = tuple(
+        self.children: tuple[XMLNode, ...] = tuple(
             XMLNode(child, self)
             for child in self.element.iterchildren()
         )
@@ -56,7 +55,7 @@ class XMLNode:
     def to_bytes(self, fp: BytesIO):
         fp.write(
             f'<{self.prefix + ":" if self.prefix else ""}{self.tag.localname}'
-            .encode('utf-8')
+            .encode()
         )
         fp.write(self._nsmap_to_string().encode('utf-8'))
         fp.write(self._attrib_to_string().encode('utf-8'))
@@ -66,7 +65,7 @@ class XMLNode:
             child.to_bytes(fp)
         fp.write(
             f'</{self.prefix + ":" if self.prefix else ""}{self.tag.localname}>'
-            .encode('utf-8')
+            .encode()
         )
 
     def _parse_attrib(self) -> None:
@@ -119,7 +118,7 @@ class XMLNode:
             if uri is not None:
                 self.get_ns(uri)
 
-    def get_ns(self, uri, is_child=False) -> Optional[str]:
+    def get_ns(self, uri, is_child=False) -> str | None:
         """Try to find registered ns prefix or generate new one"""
         if uri in self.nsmap:
             return self.nsmap[uri]

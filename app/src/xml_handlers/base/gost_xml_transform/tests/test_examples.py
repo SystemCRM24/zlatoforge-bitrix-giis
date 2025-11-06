@@ -7,7 +7,7 @@ import json
 
 
 def test_all(transform_from_str):
-    with open('tests/data.json', 'r') as fp:
+    with open('tests/data.json') as fp:
         json_data = json.load(fp)
 
     for (in_, output) in json_data:

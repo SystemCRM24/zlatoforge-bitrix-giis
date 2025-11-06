@@ -13,9 +13,17 @@ TOP=$(pwd)
 cd /assets/scripts
 
 log_info "Install Root Certificates"
-cat /certs/roots/guc2022.crt | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
-cat /certs/roots/tlscaroot.p7b | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
-cat /certs/roots/tlsca.p7b | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+
+# --- Сертификаты рабочего контура ---
+# cat /certs/prod/guc2022.crt | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+# cat /certs/prod/tlscaroot.p7b | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+# cat /certs/prod/tlsca.p7b | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+
+# --- Сертификаты тестового контура ---
+cat /certs/test/root2023-4.crt | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+cat /certs/test/rootca.cer | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+cat /certs/test/subca.cer | ./root.sh || log_info "Warning: Could not install $(basename "$cert"). Continuing..."
+
 log_info "Root certificate installation finished."
 
 # --- Install Personal Certificate ---
