@@ -3,7 +3,7 @@ from typing import Self
 from lxml import etree      # type:ignore
 import pycades              # type:ignore
 import base64
-from src.xml_handlers.base.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
+from src.dmdk_handler.gost_xml_transform.gost_xml_transform import GOSTXMLTransform
 from zeep import Client
 
 

@@ -1,15 +1,14 @@
 from fastapi import APIRouter
 
-from src.xml_handlers import SendGetGlossary
-from src.xml_handlers.base import Node
-from src.xml_handlers.base import namespaces as NS
+from src.dmdk_handler import DMDKHandler, Node
+from src.dmdk_handler import namespaces as NS
 
 
 router = APIRouter(prefix="/examples", tags=["examples"])
 
 
 @router.get("/send_get_glossary")
-async def send_get_glossary() -> str:
+async def send_get_glossary() -> dict:
     """
     Нужно учитывать, что методы парные. Этот метод - начальный из пары.
     Т.е. Сначало мы отправляем запрос на обработку данных, а вторым - запрашиваем результат.
@@ -28,19 +27,15 @@ async def send_get_glossary() -> str:
         Node(NS.NS, "page").value(1),  # Помимо строки, можно передать число.
         Node(NS.NS, "size").value(25),  # Но это значение все равно будет приведено к строке
     )
-    # 2) После, Помещаем эту структуру в обработчик через специальный метод класса.
-    # Он соберет сообщение и сделает подпись.
-    # Классы для обработчиков называем строго, как указано имя метода в документации. Это требование
-    # xml-структуры, поэтому на этом выстроена логика построения запросов.
-    request = SendGetGlossary.from_node(request_data)
-    # Для проверки себя, лучше сверяйте собранный документ, который можно получить из
-    # классов-обработчиков (у Node объектов на момент написания не реализованы методы типа __str__).
+    # 2) Помещаем эту структуру в обработчик c указанием эндпоинта для запроса. Эндпоинт копируем
+    # из документации.
+    handler = DMDKHandler("SendGetGlossary", request_data)
+    # Для проверки себя, лучше сверяйте собранный документ. До отправки запроса, сделать это можно
+    # следующим образом. Сохраним собранное сообщение в файл.
+    handler.message.build()
     with open("/app/logs/request.xml", mode="wb") as file:
-        file.write(request.to_bytes(pretty_print=True))
-    # Далее, вызываем асинхронный метод send. Для Send-группы методов, логика одинаковая для всех
-    # и она уже реализована. Возвращается в кортеже message_id и status.
-    # Обработка ошибок скрыта под капотом и можно ориентировться на статус. Он будет отличаться от
-    # ACCEPTED.
-    # реализация метода send для второго запроса из пары, по идее, будет для каждого запроса своя.
-    message_id, status = await request.send()
-    return message_id
+        file.write(handler.message.to_bytes(pretty_print=True))
+    # Далее, вызываем метод process. Под капотом он соберет сообщение, выполнит запрос и вернет
+    # ответ в виде словаря. Получить словарь также можно так: handler.response
+    response = await handler.process()
+    return response

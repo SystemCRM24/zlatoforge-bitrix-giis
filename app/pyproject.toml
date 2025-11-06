@@ -20,7 +20,7 @@ dev = [
 
 [tool.ruff]
 include = ["main.py", "src/**/*.py", "pyproject.toml"]
-extend-exclude = ["src/_examples", "src/xml_handlers/base/gost_xml_transform"]
+extend-exclude = ["src/_examples", "src/dmdk_handler/gost_xml_transform"]
 line-length = 100
 preview = true
 lint.select = ["E", "F", "W", "UP", "I", "TID25", "D101", "D102", "D103", "D107", "T201"]
