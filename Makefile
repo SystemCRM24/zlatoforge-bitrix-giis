@@ -5,5 +5,5 @@ lint-backend:
 format-backend:
 	cd app && uv run ruff format .
 
-laf: lint-backend format-backend
+laf: format-backend lint-backend
 	@echo [-- All checks passed, code formatted --]

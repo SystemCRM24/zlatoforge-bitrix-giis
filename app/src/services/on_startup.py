@@ -4,14 +4,14 @@ from pathlib import Path
 import requests
 from lxml import etree  # type:ignore
 
-from src.utils import logger
 from src.core import settings
+from src.utils import logger
 
 
 def on_startup():
     """Нужно подтянуть файлик exchange со стороны ГИИС."""
-    check_exchange_file('test', settings._giis_test_contour)
-    check_exchange_file('work', settings._giis_work_contour)
+    check_exchange_file("test", settings._giis_test_contour)
+    check_exchange_file("work", settings._giis_work_contour)
 
 
 def check_exchange_file(contour: str, address: str):

@@ -1,8 +1,8 @@
 from lxml import etree  # type:ignore
 
-from .namespaces import SOAPENV, NS
 from .cypher import dmdk_hash, dmdk_signature, get_certificate
 from .gost_xml_transform.gost_xml_transform import GOSTXMLTransform
+from .namespaces import NS, SOAPENV
 
 
 class SignedXMLMessage:
@@ -26,8 +26,8 @@ class SignedXMLMessage:
         self.namespaces = set(namespaces)
         self._root, self.request_data = self._build_template()
         self._is_signed = False
-    
-    @property 
+
+    @property
     def is_signed(self) -> bool:
         """Маркер собранного сообщения"""
         return self._is_signed
@@ -41,7 +41,7 @@ class SignedXMLMessage:
     def to_string(self, encoding="utf-8", pretty_print=False) -> str:
         """Возвращает собранное сообщение в строковом представлении"""
         return self.to_bytes(pretty_print).decode(encoding=encoding)
-    
+
     def _build_template(self):
         """Собираем шаблон для дальнейшего использования."""
         local_nsmap = self._get_local_nsmap()
@@ -60,7 +60,7 @@ class SignedXMLMessage:
         """Подписывает сообщение"""
         if self._is_signed:
             return
-        caller_signature_node = self._root.find(f'.//{self.NS_PREFIX}CallerSignature')
+        caller_signature_node = self._root.find(f".//{self.NS_PREFIX}CallerSignature")
         signature_node = etree.SubElement(
             caller_signature_node, f"{self.DS_PREFIX}Signature", nsmap=self.DSMAP
         )
@@ -74,9 +74,11 @@ class SignedXMLMessage:
     def _get_local_nsmap(self) -> dict[str, str]:
         """Возвращает карту пространства имен для этого сообщения."""
         local_nsmap = self.NSMAP.copy()
-        for i, namespace in enumerate(self.namespaces, start=1):
+        counter = 1
+        for namespace in self.namespaces:
             if namespace != SOAPENV and namespace != NS:
-                local_nsmap[f'ns{i}'] = namespace
+                local_nsmap[f"ns{counter}"] = namespace
+                counter += 1
         return local_nsmap
 
     def _transform_node(self, xml_node, smev=False) -> bytes:
