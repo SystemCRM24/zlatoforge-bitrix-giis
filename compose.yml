@@ -1,7 +1,7 @@
 x-app_environment: &app_environment
   environment:
     # Common
-    DEBUG: ${DEBUG}
+    MODE: ${MODE}
     # Bitrix
     APP_PORT: ${APP_PORT}
 

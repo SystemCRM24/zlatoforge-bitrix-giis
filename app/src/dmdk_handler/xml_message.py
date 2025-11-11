@@ -1,21 +1,18 @@
 from lxml import etree  # type:ignore
 
+from .namespaces import SOAPENV, NS
 from .cypher import dmdk_hash, dmdk_signature, get_certificate
 from .gost_xml_transform.gost_xml_transform import GOSTXMLTransform
-from .node import Node
 
 
 class SignedXMLMessage:
     """Собирает подписанное XML-сообщение для ДМДК."""
 
-    __slots__ = ("endpoint", "request_data", "_root")
+    __slots__ = ("endpoint", "namespaces", "_root", "request_data", "_is_signed")
 
-    NSMAP = {
-        "soapenv": "http://schemas.xmlsoap.org/soap/envelope/",
-        "ns": "urn://xsd.dmdk.goznak.ru/exchange/3.0",
-    }
-    SOAPENV_PREFIX = f"{{{NSMAP['soapenv']}}}"
-    NS_PREFIX = f"{{{NSMAP['ns']}}}"
+    NSMAP = {"soapenv": SOAPENV, "ns": NS}
+    SOAPENV_PREFIX = f"{{{SOAPENV}}}"
+    NS_PREFIX = f"{{{NS}}}"
     DSMAP = {"ds": "http://www.w3.org/2000/09/xmldsig#"}  # Специфичный неймспейс нужный для подписи
     DS_PREFIX = f"{{{DSMAP['ds']}}}"
     C14N_TRANSFORM = "http://www.w3.org/2001/10/xml-exc-c14n#"
@@ -24,10 +21,16 @@ class SignedXMLMessage:
     DIGEST_METHOD = "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"
     REQUEST_DATA_TAG = "RequestData"
 
-    def __init__(self, endpoint: str, request_data: Node) -> None:
+    def __init__(self, endpoint: str, *namespaces) -> None:
         self.endpoint = endpoint
-        self.request_data = request_data
-        self._root = None
+        self.namespaces = set(namespaces)
+        self._root, self.request_data = self._build_template()
+        self._is_signed = False
+    
+    @property 
+    def is_signed(self) -> bool:
+        """Маркер собранного сообщения"""
+        return self._is_signed
 
     def to_bytes(self, pretty_print=False) -> bytes:
         """Возвращает собранное сообщение в байтовом представлении"""
@@ -38,64 +41,43 @@ class SignedXMLMessage:
     def to_string(self, encoding="utf-8", pretty_print=False) -> str:
         """Возвращает собранное сообщение в строковом представлении"""
         return self.to_bytes(pretty_print).decode(encoding=encoding)
-
-    def build(self):
-        """Собирает и подписывает сообщение"""
-        if self._root is not None:
-            return
-        self._normalize_request_data()
+    
+    def _build_template(self):
+        """Собираем шаблон для дальнейшего использования."""
         local_nsmap = self._get_local_nsmap()
         # Собираем корневую структуру
-        root_node = self._root = etree.Element(f"{self.SOAPENV_PREFIX}Envelope", nsmap=local_nsmap)
+        root_node = etree.Element(f"{self.SOAPENV_PREFIX}Envelope", nsmap=local_nsmap)
         etree.SubElement(root_node, f"{self.SOAPENV_PREFIX}Header")
         body_node = etree.SubElement(root_node, f"{self.SOAPENV_PREFIX}Body")
         request_node = etree.SubElement(body_node, f"{self.NS_PREFIX}{self.endpoint}Request")
-        caller_signature_node = etree.SubElement(request_node, f"{self.NS_PREFIX}CallerSignature")
-        # Заполняем данные для запроса
-        request_data_node = self._fill_request_node(request_node, self.request_data)
+        etree.SubElement(request_node, f"{self.NS_PREFIX}CallerSignature")
+        request_data_node = etree.SubElement(
+            request_node, f"{self.NS_PREFIX}RequestData", id=self.REQUEST_DATA_TAG
+        )
+        return root_node, request_data_node
+
+    def sign(self):
+        """Подписывает сообщение"""
+        if self._is_signed:
+            return
+        caller_signature_node = self._root.find(f'.//{self.NS_PREFIX}CallerSignature')
         signature_node = etree.SubElement(
             caller_signature_node, f"{self.DS_PREFIX}Signature", nsmap=self.DSMAP
         )
-        transformed_reference = self._transform_node(request_data_node, smev=True)
+        transformed_reference = self._transform_node(self.request_data, smev=True)
         signed_info_node = self._create_and_fill_signed_info(signature_node, transformed_reference)
         transformed_signed_info = self._transform_node(signed_info_node)
         self._sign_signed_info(signature_node, transformed_signed_info)
         self._insert_key_info(signature_node)
-
-    def _normalize_request_data(self):
-        """Нормализует корневую ноду"""
-        self.request_data.name = self.REQUEST_DATA_TAG
-        self.request_data.namespace = self.NSMAP["ns"]
-        self.request_data.kwargs["id"] = self.REQUEST_DATA_TAG
+        self._is_signed = True
 
     def _get_local_nsmap(self) -> dict[str, str]:
         """Возвращает карту пространства имен для этого сообщения."""
-
-        def find_namespaces(node: Node, accumulator: set):
-            """Рекурсивно обходит node для сбора существующиъ пространств имен"""
-            accumulator.add(node.namespace)
-            if not isinstance(node._value, str):
-                for sub_node in node._value:
-                    find_namespaces(sub_node, accumulator)  # type:ignore
-
-        accumulator = set()
-        find_namespaces(self.request_data, accumulator)
         local_nsmap = self.NSMAP.copy()
-        for i, v in enumerate(accumulator, start=1):
-            local_nsmap[f"ns{i}"] = v
+        for i, namespace in enumerate(self.namespaces, start=1):
+            if namespace != SOAPENV and namespace != NS:
+                local_nsmap[f'ns{i}'] = namespace
         return local_nsmap
-
-    def _fill_request_node(self, parent_xml_node, node: Node):
-        """Рекурсивно заполняет parent_node значениями из node."""
-        xml_node = etree.SubElement(
-            parent_xml_node, f"{{{node.namespace}}}{node.name}", **node.kwargs
-        )
-        if isinstance(node._value, str):
-            xml_node.text = node._value
-        else:
-            for sub_node in node._value:
-                self._fill_request_node(xml_node, sub_node)
-        return xml_node
 
     def _transform_node(self, xml_node, smev=False) -> bytes:
         """Выполняет трансформ c14n над переданной нодой. Дополнительно, можно сделать СМЕВ."""

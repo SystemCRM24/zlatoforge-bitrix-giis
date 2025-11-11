@@ -1,2 +1,2 @@
 from .handler import DMDKHandler
-from .node import Node
+from .xml_message import SignedXMLMessage
