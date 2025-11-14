@@ -1,5 +1,7 @@
 import asyncio
 import random
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal, Union
 
 from lxml import etree  # type:ignore
@@ -19,6 +21,7 @@ class DMDKHandler:
     TEST_CLIENT = None
     DMDK_HEADERS = {"Content-Type": "text/xml; charset=utf-8"}
     MAXIMUM_TRIES = 20
+    TIME_PATTERN = "%Y-%m-%d %H-%M-%S-%f"
 
     def _get_soap_client(self) -> AsyncClient:
         """Из-за того, что при старте файла excnahge3.wsdl может не быть, пользуемся методом."""
@@ -32,13 +35,17 @@ class DMDKHandler:
         logger.debug("DMDKHandler uses Test contour.")
         return self.__class__.TEST_CLIENT
 
-    def __init__(self, message: SignedXMLMessage, contour: Literal["test", "work", "app"] = "app"):
+    def __init__(
+        self, message: SignedXMLMessage, contour: Literal["test", "work", "app"] = "app", log=False
+    ):
         """
         contour - контур, который будет учавствовать в запросах.
         Если явно не определн test или work - выбирается в зависимости от режима прилоожения.
         """
         self.message = message
         self.contour = contour
+        self.log = log
+        self._requested_at = None
         self.response: Any = None
 
     def _setup_post_request(self, message: str) -> dict:
@@ -54,7 +61,11 @@ class DMDKHandler:
         Флаг await_check_result нужен для того, чтобы дождаться результата check запроса.
         Сервер может его вернуть не сразу.
         """
+        if self._requested_at is None:
+            self._requested_at = datetime.now(settings.TIME_ZONE)
         self.message.sign()
+        if self.log:
+            asyncio.create_task(self._log_message())
         message_str = self.message.to_string()
         client = self._get_soap_client()
         attempt = 1
@@ -75,12 +86,37 @@ class DMDKHandler:
                 attempt += 1
                 await asyncio.sleep(random.random())
         self.response = content
+        if self.log:
+            asyncio.create_task(self._log_response())
         status_text = status.text if status is not None else None
         logger.success(f"Data from DMDK API received, status = {status_text}")
         return self.response
 
+    def _make_log_path(self) -> str:
+        """Возвращает патч до логов"""
+        time = self._requested_at.strftime(self.TIME_PATTERN)  # type:ignore
+        path = f"./logs/{time}"
+        Path(path).mkdir(exist_ok=True)
+        prefix = "send" if self.message.endpoint.startswith("Send") else "check"
+        return f"{path}/{prefix}"
+
+    async def _log_message(self):
+        """логаем сообщение для ДМДК"""
+        path = self._make_log_path()
+        with open(f"{path}-request.xml", mode="wb") as file:
+            file.write(self.message.to_bytes(True))
+
+    async def _log_response(self):
+        """Логаем ответ от ДМДК"""
+        path = self._make_log_path()
+        with open(f"{path}-response.xml", mode="wb") as file:
+            file.write(etree.tostring(self.response, pretty_print=True, encoding="utf-8"))
+
     def create_check_request(self) -> Union["DMDKHandler", None]:
-        """Фабрика для выполнения Check - запросов. Вернет новый объект DMDKHandler."""
+        """
+        Фабрика для выполнения Check - запросов. Вернет новый объект DMDKHandler
+        в котором все атрибуты наследуются от текущего объекта.
+        """
         is_send_method = self.message.endpoint.startswith("Send")
         message_id_node = self.response.find(f".//{{{NS}}}messageId")
         message_id = message_id_node is not None and message_id_node.text
@@ -90,4 +126,19 @@ class DMDKHandler:
         check_message = SignedXMLMessage(endpoint, NS)
         message_id_node = etree.SubElement(check_message.request_data, f"{{{NS}}}messageId")
         message_id_node.text = message_id
-        return DMDKHandler(check_message)
+        handler = DMDKHandler(check_message)
+        handler.contour = self.contour
+        handler.log = self.log
+        handler._requested_at = self._requested_at
+        return handler
+
+    def response_to_list(self) -> list:
+        """Возвращает респонс в виде списка. Используется для отладки."""
+        response_data = self.response.xpath("//*[local-name() = 'ResponseData']")
+        if response_data:
+            response_data = response_data[0]
+            response_data.tag = etree.QName(response_data).localname
+            response_data.attrib.clear()
+            decoded_response = etree.tostring(response_data, pretty_print=True, encoding="utf-8")
+            return decoded_response.decode().split("\n")
+        return []

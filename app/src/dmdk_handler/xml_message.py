@@ -32,11 +32,11 @@ class SignedXMLMessage:
         """Маркер собранного сообщения"""
         return self._is_signed
 
-    def to_bytes(self, pretty_print=False) -> bytes:
+    def to_bytes(self, pretty_print=False, encoding="utf-8") -> bytes:
         """Возвращает собранное сообщение в байтовом представлении"""
         if self._root is None:
             raise ValueError("Message is not builded. Use build_message method first.")
-        return etree.tostring(self._root, pretty_print=pretty_print)
+        return etree.tostring(self._root, pretty_print=pretty_print, encoding=encoding)
 
     def to_string(self, encoding="utf-8", pretty_print=False) -> str:
         """Возвращает собранное сообщение в строковом представлении"""

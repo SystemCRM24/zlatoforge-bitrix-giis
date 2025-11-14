@@ -2,6 +2,8 @@ x-app_environment: &app_environment
   environment:
     # Common
     MODE: ${MODE}
+    BITRIX_WEBHOOK: ${BITRIX_WEBHOOK}
+    DEFAULT_USER: ${DEFAULT_USER}
     # Bitrix
     APP_PORT: ${APP_PORT}
 

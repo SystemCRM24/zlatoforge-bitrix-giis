@@ -1,3 +1,5 @@
+from datetime import timedelta, timezone
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,6 +9,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     MODE: str
+    BITRIX_WEBHOOK: str
+    DEFAULT_USER: str
+    TIME_ZONE: timezone = timezone(timedelta(hours=3), name="MSK")
 
     # Для работы с контурами ГИИС
     @property
