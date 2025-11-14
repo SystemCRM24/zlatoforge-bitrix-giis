@@ -21,5 +21,8 @@ class BitrixRepository:
         """Отправляет уведомление пользователю"""
         if user_id is None:
             user_id = settings.DEFAULT_USER
+        # user_id может прийти в таком формате, поэтому надо его преобразовать
+        if user_id.startswith('user'):
+            user_id = user_id[5:]
         items = {"USER_ID": user_id, "MESSAGE": message}
         return await BX.call("im.notify.personal.add", items)
