@@ -1,4 +1,5 @@
 from lxml import etree  # type:ignore
+import asyncio
 
 from src.bitrix import BitrixRepository
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
@@ -8,16 +9,22 @@ from src.schemas.bitrix import BitrixClient
 async def check_bitrix_contact(contact_id: str, user_id: str | None):
     """Проверяет контакт в битрикс24 и отправляет уведомление пользователю."""
     contact = await BitrixRepository.get_bitrix_contact(contact_id)
+    ntf = (
+        f'Осуществляется проверка клиента {contact.last_name} {contact.name} '
+        'в реестрах Росфинмониторинга.'
+    )
+    ntf_coro = BitrixRepository.send_notification(ntf)
+    asyncio.create_task(ntf_coro)
     if contact.birth_date is None:
         notification = (
             f"Необходимо указать дату рождения клиента {contact.last_name} {contact.name} "
-            "для осуществления проверки в реестрах Росфинмониторинга."
+            "для осуществления проверки."
         )
         return await BitrixRepository.send_notification(notification, user_id)
     if not contact.check_passport_data():
         notification = (
             f"Необходимо заполнить все паспортные данные клиента {contact.last_name} {contact.name}"
-            " для осуществления проверки в реестрах Росфинмониторинга."
+            " для осуществления проверки."
         )
         return await BitrixRepository.send_notification(notification, user_id)
     soap_message = get_send_get_personal_verify_rfm_message(contact)
