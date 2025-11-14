@@ -1,42 +1,48 @@
-from lxml import etree  # type:ignore
 import asyncio
+
+from lxml import etree  # type:ignore
 
 from src.bitrix import BitrixRepository
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
 from src.schemas.bitrix import BitrixClient
 
 
-async def check_bitrix_contact(contact_id: str, user_id: str | None):
+async def check_bitrix_contact(contact_id: str, user_id: str | None) -> bool | None:
     """Проверяет контакт в битрикс24 и отправляет уведомление пользователю."""
     contact = await BitrixRepository.get_bitrix_contact(contact_id)
     ntf = (
-        f'Осуществляется проверка клиента {contact.last_name} {contact.name} '
-        'в реестрах Росфинмониторинга.'
+        f"Осуществляется проверка клиента {contact.last_name} {contact.name} "
+        "в реестрах Росфинмониторинга."
     )
-    ntf_coro = BitrixRepository.send_notification(ntf)
+    ntf_coro = BitrixRepository.send_notification(ntf, user_id)
     asyncio.create_task(ntf_coro)
     if contact.birth_date is None:
         notification = (
             f"Необходимо указать дату рождения клиента {contact.last_name} {contact.name} "
             "для осуществления проверки."
         )
-        return await BitrixRepository.send_notification(notification, user_id)
+        asyncio.create_task(BitrixRepository.send_notification(notification, user_id))
+        return
     if not contact.check_passport_data():
         notification = (
             f"Необходимо заполнить все паспортные данные клиента {contact.last_name} {contact.name}"
             " для осуществления проверки."
         )
-        return await BitrixRepository.send_notification(notification, user_id)
+        asyncio.create_task(BitrixRepository.send_notification(notification, user_id))
+        return
     soap_message = get_send_get_personal_verify_rfm_message(contact)
     handler = DMDKHandler(soap_message)
     await handler.process()
     check_handler = handler.create_check_request()
     if check_handler:
         await check_handler.process(True)
-        response = check_handler.response_to_list()[-4:-3]
-        msg = f"Клиент {contact.last_name} {contact.name} проверен.\nСтатус: {''.join(response)}"
-        return await BitrixRepository.send_notification(msg)
-    await BitrixRepository.send_notification("Внутренняя ошибка ДМДК")
+        result_node = check_handler.response.find(f".//{{{namespaces.NS}}}result")
+        status_node = result_node.find(f".//{{{namespaces.NS}}}status")
+        status = status_node.text
+        msg = f"Клиент {contact.last_name} {contact.name} проверен.\nСтатус: {status}"
+        asyncio.create_task(BitrixRepository.send_notification(msg))
+        return status != "IS_NOT_TERRORIST"
+    asyncio.create_task(BitrixRepository.send_notification("Внутренняя ошибка ДМДК"))
 
 
 def get_send_get_personal_verify_rfm_message(client: BitrixClient) -> SignedXMLMessage:
