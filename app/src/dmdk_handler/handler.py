@@ -2,7 +2,7 @@ import asyncio
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from lxml import etree  # type:ignore
 from zeep import AsyncClient
@@ -20,8 +20,9 @@ class DMDKHandler:
     WORK_CLIENT = None
     TEST_CLIENT = None
     DMDK_HEADERS = {"Content-Type": "text/xml; charset=utf-8"}
-    MAXIMUM_TRIES = 20
+    MAXIMUM_TRIES = 30
     TIME_PATTERN = "%Y-%m-%d %H-%M-%S-%f"
+    LOCK = asyncio.Lock()
 
     def _get_soap_client(self) -> AsyncClient:
         """Из-за того, что при старте файла excnahge3.wsdl может не быть, пользуемся методом."""
@@ -55,12 +56,17 @@ class DMDKHandler:
             address = settings._giis_work_contour
         return {"address": address, "message": message, "headers": self.DMDK_HEADERS}
 
-    async def process(self, await_check_result=False) -> dict:
+    async def process(self, await_check_result=False) -> Any:
         """
         Отправляет собранный запрос и парсит ответ и превращает его в словарь
         Флаг await_check_result нужен для того, чтобы дождаться результата check запроса.
         Сервер может его вернуть не сразу.
         """
+        async with self.LOCK:
+            return await self._process(await_check_result)
+
+    async def _process(self, await_check_result=False) -> Any:
+        """Непосредственно, логика обработки."""
         if self._requested_at is None:
             self._requested_at = datetime.now(settings.TIME_ZONE)
         self.message.sign()
@@ -112,16 +118,19 @@ class DMDKHandler:
         with open(f"{path}-response.xml", mode="wb") as file:
             file.write(etree.tostring(self.response, pretty_print=True, encoding="utf-8"))
 
-    def create_check_request(self) -> Union["DMDKHandler", None]:
+    def create_check_request(self) -> "DMDKHandler":
         """
         Фабрика для выполнения Check - запросов. Вернет новый объект DMDKHandler
         в котором все атрибуты наследуются от текущего объекта.
         """
-        is_send_method = self.message.endpoint.startswith("Send")
+        if not self.message.endpoint.startswith("Send"):
+            raise AttributeError(
+                f'Failed to create "Check..." handler. {self.message.endpoint} doesn\'t Send...'
+            )
         message_id_node = self.response.find(f".//{{{NS}}}messageId")
         message_id = message_id_node is not None and message_id_node.text
-        if not all((is_send_method, message_id)):
-            return
+        if not message_id:
+            raise AttributeError(f'Failed to create "Check..." handler. {message_id=} is invalid.')
         endpoint = f"Check{self.message.endpoint[4:]}"
         check_message = SignedXMLMessage(endpoint, NS)
         message_id_node = etree.SubElement(check_message.request_data, f"{{{NS}}}messageId")

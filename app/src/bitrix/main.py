@@ -1,7 +1,7 @@
 from fast_bitrix24 import BitrixAsync
 
 from src.core import settings
-from src.schemas.bitrix import BitrixClient
+from src.schemas.bitrix import BitrixContact
 
 
 BX = BitrixAsync(webhook=settings.BITRIX_WEBHOOK, verbose=False)
@@ -11,10 +11,10 @@ class BitrixRepository:
     """Репозиторий для работы с битриксом"""
 
     @staticmethod
-    async def get_bitrix_contact(contact_id: str) -> BitrixClient:
+    async def get_bitrix_contact(contact_id: str) -> BitrixContact:
         """Получить контакт по ID"""
         contact_info: dict = await BX.call("crm.contact.get", {"id": contact_id}, raw=True)
-        return BitrixClient.model_validate(contact_info.get("result", {}))
+        return BitrixContact.model_validate(contact_info.get("result", {}))
 
     @staticmethod
     async def send_notification(message: str, user_id: str | None = None):
