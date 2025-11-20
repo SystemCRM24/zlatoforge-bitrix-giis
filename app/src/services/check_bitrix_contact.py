@@ -5,6 +5,7 @@ from lxml import etree  # type:ignore
 from src.bitrix import BitrixRepository
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
 from src.schemas.bitrix import BitrixClient
+from src.utils import logger
 
 
 async def check_bitrix_contact(contact_id: str, user_id: str | None) -> bool | None:
@@ -31,17 +32,20 @@ async def check_bitrix_contact(contact_id: str, user_id: str | None) -> bool | N
         asyncio.create_task(BitrixRepository.send_notification(notification, user_id))
         return
     soap_message = get_send_get_personal_verify_rfm_message(contact)
-    handler = DMDKHandler(soap_message)
-    await handler.process()
-    check_handler = handler.create_check_request()
-    if check_handler:
-        await check_handler.process(True)
-        result_node = check_handler.response.find(f".//{{{namespaces.NS}}}result")
-        status_node = result_node.find(f".//{{{namespaces.NS}}}status")
-        status = status_node.text
-        msg = f"Клиент {contact.last_name} {contact.name} проверен.\nСтатус: {status}"
-        asyncio.create_task(BitrixRepository.send_notification(msg))
-        return status != "IS_NOT_TERRORIST"
+    try:
+        handler = DMDKHandler(soap_message)
+        await handler.process()
+        check_handler = handler.create_check_request()
+        if check_handler:
+            await check_handler.process(True)
+            result_node = check_handler.response.find(f".//{{{namespaces.NS}}}result")
+            status_node = result_node.find(f".//{{{namespaces.NS}}}status")
+            status = status_node.text
+            msg = f"Клиент {contact.last_name} {contact.name} проверен.\nСтатус: {status}"
+            asyncio.create_task(BitrixRepository.send_notification(msg))
+            return status != "IS_NOT_TERRORIST"
+    except Exception as e:
+        logger.exception(str(e))
     asyncio.create_task(BitrixRepository.send_notification("Внутренняя ошибка ДМДК"))
 
 

@@ -14,7 +14,7 @@ assert CERTS.Count != 0, "Certificates with private key not found"
 CLIENT_CERT = CERTS.Item(1)  # У клиента он первый на очереди
 SIGNER = pycades.Signer()
 SIGNER.Certificate = CLIENT_CERT
-SIGNER.CheckCertificate = True
+SIGNER.CheckCertificate = False
 
 
 def dmdk_hash(string: bytes) -> str:
