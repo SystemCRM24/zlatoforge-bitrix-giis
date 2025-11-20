@@ -4,20 +4,22 @@ from lxml import etree  # type:ignore
 
 from src.bitrix import BitrixRepository
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
-from src.schemas.bitrix import BitrixContact
+from src.schemas.bitrix import ContactSchema
 from src.utils import logger
 
 from .notificator import Notificator
 from .service_validator import ServiceException, ServiceValidator
 
 
-async def create_scrap_receipt(contact_id: str, user_id: str):
+async def create_scrap_receipt(deal_id: str, user_id: str):
     """Формирование квитанции на скупку лома"""
-    contact_id = "35732"
+    contact_id = "35732"  # Контакт Максима для теста
     try:
+        dmdks = await BitrixRepository.get_dmdks_from_deal(deal_id)
+        deal = await BitrixRepository.get_deal(deal_id)
         contact = await BitrixRepository.get_bitrix_contact(contact_id)
         receipt_id = await create_receipt_draft(contact, user_id)
-        logger.success(receipt_id)
+        logger.success(f"{dmdks}, {deal}, {receipt_id}")
     except ServiceException as e:
         Notificator.send_message(user_id, str(e))
     except Exception as e:
@@ -25,9 +27,9 @@ async def create_scrap_receipt(contact_id: str, user_id: str):
         logger.exception(str(e))
 
 
-async def create_receipt_draft(contact: BitrixContact, user_id: str) -> str:
+async def create_receipt_draft(contact: ContactSchema, user_id: str) -> str:
     """Создает черновик квитанции и возвращает ее номер."""
-    client = f"{contact.last_name} {contact.name}"
+    client = f"{contact.LAST_NAME} {contact.NAME}"
     Notificator.send_create_scrap_receipt(user_id, client)
     ServiceValidator.check_birthdate(contact)
     ServiceValidator.check_passport_data(contact)
@@ -43,7 +45,7 @@ async def create_receipt_draft(contact: BitrixContact, user_id: str) -> str:
     return id_node.text
 
 
-def get_send_buyingup_message(contact: BitrixContact) -> SignedXMLMessage:
+def get_send_buyingup_message(contact: ContactSchema) -> SignedXMLMessage:
     """Собираем сообщение на создание бланка квитанции."""
     ns = namespaces.NS
     ns1 = namespaces.CONTRACTOR
@@ -70,11 +72,11 @@ def get_send_buyingup_message(contact: BitrixContact) -> SignedXMLMessage:
     doc_type_node = etree.SubElement(identity_document_node, f"{{{ns3}}}docType")
     doc_type_node.text = "PASSPORT"
     serial_node = etree.SubElement(identity_document_node, f"{{{ns3}}}serial")
-    serial_node.text = contact.passport_serial
+    serial_node.text = contact.PASSPORT_SERIAL
     number_node = etree.SubElement(identity_document_node, f"{{{ns3}}}number")
-    number_node.text = contact.passport_number
+    number_node.text = contact.PASSPORT_NUMBER
     issue_date_node = etree.SubElement(identity_document_node, f"{{{ns3}}}issueDate")
     issue_date_node.text = contact.passport_issue_date.date().isoformat()  # type: ignore
     issuer_node = etree.SubElement(identity_document_node, f"{{{ns3}}}issuer")
-    issuer_node.text = contact.passport_issuer
+    issuer_node.text = contact.PASSPORT_ISSUER
     return message
