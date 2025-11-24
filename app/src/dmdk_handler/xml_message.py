@@ -23,7 +23,7 @@ class SignedXMLMessage:
 
     def __init__(self, endpoint: str, *namespaces) -> None:
         self.endpoint = endpoint
-        self.namespaces = set(namespaces)
+        self.namespaces = namespaces
         self._root, self.request_data = self._build_template()
         self._is_signed = False
 
@@ -73,12 +73,16 @@ class SignedXMLMessage:
 
     def _get_local_nsmap(self) -> dict[str, str]:
         """Возвращает карту пространства имен для этого сообщения."""
-        local_nsmap = self.NSMAP.copy()
-        counter = 1
+        local_nsmap = {}
+        namespaces_set = set()
+        for k, v in self.NSMAP.items():
+            local_nsmap[k] = v
+            namespaces_set.add(v)
+        counter = 0
         for namespace in self.namespaces:
-            if namespace != SOAPENV and namespace != NS:
-                local_nsmap[f"ns{counter}"] = namespace
+            if namespace not in namespaces_set:
                 counter += 1
+                local_nsmap[f"ns{counter}"] = namespace
         return local_nsmap
 
     def _transform_node(self, xml_node, smev=False) -> bytes:

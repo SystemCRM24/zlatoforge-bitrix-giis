@@ -25,8 +25,7 @@ async def check_bitrix_contact(contact_id: str, user_id: str | None) -> bool | N
         result_node = check_handler.response.find(f".//{{{namespaces.NS}}}result")
         status_node = result_node.find(f".//{{{namespaces.NS}}}status")
         status = status_node.text
-        msg = f"Клиент {contact.LAST_NAME} {contact.NAME} проверен.\nСтатус: {status}"
-        Notificator.send_message(user_id, msg)
+        Notificator.send_check_rfm_result(user_id, client, status)
         return status != "IS_NOT_TERRORIST"
     except ServiceException as e:
         Notificator.send_message(user_id, str(e))
@@ -47,7 +46,7 @@ def get_send_get_personal_verify_rfm_message(contact: ContactSchema) -> SignedXM
     first_name_node = etree.SubElement(preson_node, f"{{{ns1}}}firstName")
     first_name_node.text = contact.NAME
     birth_day_node = etree.SubElement(preson_node, f"{{{ns1}}}birthDay")
-    birth_day_node.text = contact.birth_date.date().isoformat()  # type:ignore
+    birth_day_node.text = contact.BIRTHDATE.date().isoformat()  # type:ignore
     identity_document_node = etree.SubElement(preson_node, f"{{{ns1}}}identityDocument")
     doc_type_node = etree.SubElement(identity_document_node, f"{{{ns2}}}docType")
     doc_type_node.text = "PASSPORT"
@@ -56,7 +55,7 @@ def get_send_get_personal_verify_rfm_message(contact: ContactSchema) -> SignedXM
     number_node = etree.SubElement(identity_document_node, f"{{{ns2}}}number")
     number_node.text = contact.PASSPORT_NUMBER
     issue_date_node = etree.SubElement(identity_document_node, f"{{{ns2}}}issueDate")
-    issue_date_node.text = contact.passport_issue_date.date().isoformat()  # type:ignore
+    issue_date_node.text = contact.PASSPORT_ISSUE_DATE.date().isoformat()  # type:ignore
     issuer_node = etree.SubElement(identity_document_node, f"{{{ns2}}}issuer")
     issuer_node.text = contact.PASSPORT_ISSUER
     return message

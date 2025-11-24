@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -9,3 +11,4 @@ class DealSchema(BaseModel):
     ID: str
     TITLE: str
     CONTACT_ID: str
+    DATE_CREATE: datetime

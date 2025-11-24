@@ -14,6 +14,10 @@ from .namespaces import NS
 from .xml_message import SignedXMLMessage
 
 
+class DMDMKHandlerException(Exception):
+    """Кастомный тип исключений для обработчика."""
+
+
 class DMDKHandler:
     """Обработчик запросов к ДМДК"""
 
@@ -62,11 +66,6 @@ class DMDKHandler:
         Флаг await_check_result нужен для того, чтобы дождаться результата check запроса.
         Сервер может его вернуть не сразу.
         """
-        async with self.LOCK:
-            return await self._process(await_check_result)
-
-    async def _process(self, await_check_result=False) -> Any:
-        """Непосредственно, логика обработки."""
         if self._requested_at is None:
             self._requested_at = datetime.now(settings.TIME_ZONE)
         self.message.sign()
@@ -80,7 +79,8 @@ class DMDKHandler:
         logger.debug(f"Trying to fetch data from DMDK API, method = {self.message.endpoint}")
         with client.settings(raw_response=True):
             while attempt < self.MAXIMUM_TRIES:
-                response = await client.transport.post(**self._setup_post_request(message_str))
+                async with self.LOCK:
+                    response = await client.transport.post(**self._setup_post_request(message_str))
                 content = etree.fromstring(response.content)
                 status = content.find(f".//{{{NS}}}status")
                 if not await_check_result or not is_check_method:
@@ -88,13 +88,18 @@ class DMDKHandler:
                 response_data = content.find(f".//{{{NS}}}ResponseData")
                 if len(response_data) > 2 or status.text == "PREPARED":
                     break
-                logger.debug(f"Waiting for resonse DMDK API, attempts = {attempt}")
+                logger.debug(
+                    f"Waiting for resonse DMDK API status = {status.text}, attempts = {attempt}"
+                )
+                delay = random.random() * 2
+                await asyncio.sleep(delay)
                 attempt += 1
-                await asyncio.sleep(random.random())
         self.response = content
         if self.log:
             asyncio.create_task(self._log_response())
         status_text = status.text if status is not None else None
+        self._check_validation_fault()
+        self._check_inner_dmdk_exception()
         logger.success(f"Data from DMDK API received, status = {status_text}")
         return self.response
 
@@ -117,6 +122,27 @@ class DMDKHandler:
         path = self._make_log_path()
         with open(f"{path}-response.xml", mode="wb") as file:
             file.write(etree.tostring(self.response, pretty_print=True, encoding="utf-8"))
+
+    def _check_validation_fault(self) -> bool:
+        """Проверяем ответ от ДМДК на предмет правильности заполнения сообщения и типов данных."""
+        error_detail_type_node = self.response.xpath("//*[local-name() = 'ErrorDetailType']")
+        if not error_detail_type_node:
+            return True
+        error_detail_type_node = error_detail_type_node[0]
+        code_node = error_detail_type_node.find(f".//{{{NS}}}code")
+        msg_node = error_detail_type_node.find(f".//{{{NS}}}msg")
+        raise DMDMKHandlerException(f"Code={code_node.text}\nmsg={msg_node.text}")
+
+    def _check_inner_dmdk_exception(self) -> bool:
+        """поиск внутренней ошибки ДМДК"""
+        # failure_node = self.response.xpath("//*[local-name() = 'ErrorDetailType']")
+        failure_node = self.response.find(f".//{{{NS}}}failure")
+        if not failure_node:
+            return True
+        error_node = failure_node.find(f".//{{{NS}}}error")
+        code_node = error_node.find(f".//{{{NS}}}code")
+        msg_node = error_node.find(f".//{{{NS}}}msg")
+        raise DMDMKHandlerException(f"Code={code_node.text}\nmsg={msg_node.text}")
 
     def create_check_request(self) -> "DMDKHandler":
         """
