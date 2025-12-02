@@ -6,20 +6,25 @@ class DMDKULSchema(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    # Общая информация
     ID: str
     NAME: str
     UL_TYPE: str = Field(alias="PROPERTY_920", default="")
-    METAL_TYPE: str = Field(alias="PROPERTY_968", default="")
-    HALLMARK: str = Field(alias="PROPERTY_970", default="")  # Проба
+    IS_GIIS_INTEGRATION: bool = Field(alias="PROPERTY_1762", default=False)
     COMMON_WEIGHT: str = Field(alias="PROPERTY_972", default="")
     WEIGHT: str = Field(alias="PROPERTY_974", default="")
     HCM: str = Field(alias="PROPERTY_976", default="")
     QUANTITY: str = Field(alias="PROPERTY_978", default="")
     AMOUNT: str = Field(alias="PROPERTY_264", default="")
+    # Информация по металлу
+    METAL_TYPE: str = Field(alias="PROPERTY_968", default="")
+    METAL_HALLMARK: str = Field(alias="PROPERTY_970", default="")  # Проба
+    METAL_WEIGHT: str = Field(alias="PROPERTY_256", default="")
 
     @field_validator(
         "METAL_TYPE",
-        "HALLMARK",
+        "METAL_HALLMARK",
+        "METAL_WEIGHT",
         "COMMON_WEIGHT",
         "WEIGHT",
         "HCM",
@@ -34,6 +39,14 @@ class DMDKULSchema(BaseModel):
         for val in value.values():
             return val
         return ""
+
+    @field_validator("IS_GIIS_INTEGRATION", mode="before")
+    @classmethod
+    def validate_is_giis_integration(cls, value: dict) -> bool:
+        """Спец-валидация для интеграции с гиис."""
+        for val in value.values():
+            return val == "1100"
+        return False
 
     @computed_field
     @property
@@ -77,6 +90,12 @@ class DMDKULSchema(BaseModel):
         """Чистая химическая масса в граммах выраженный в единицах измерения ДМДК"""
         return self.grm_to_dmdk_exp(self.HCM)
 
+    @computed_field
+    @property
+    def METAL_WEIGHT_EXP(self) -> str:
+        """Вес металла в представлении единиц измерения ДМДК"""
+        return self.grm_to_dmdk_exp(self.METAL_WEIGHT)
+
     @staticmethod
     def grm_to_dmdk_exp(weight: str) -> str:
         """Переводим граммы в милиграммы"""
@@ -96,6 +115,6 @@ class DMDKULSchema(BaseModel):
     @property
     def HALLMARK_EXP(self) -> str:
         """Проба в единицах измерения ДМДК"""
-        if self.HALLMARK:
-            return str(int(float(self.HALLMARK) * 1e2))
+        if self.METAL_HALLMARK:
+            return str(int(float(self.METAL_HALLMARK) * 1e2))
         return "0"

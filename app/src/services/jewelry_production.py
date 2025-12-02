@@ -11,20 +11,18 @@ from .notificator import Notificator
 from .service_validator import ServiceException, ServiceValidator
 
 
-async def create_scrap_receipt(deal_id: str, user_id: str):
-    """Формирование квитанции на скупку лома"""
+async def create_production_receipt(deal_id: str, user_id: str):
+    """Создание квитанции на изготовление ювелирных изделий."""
     try:
-        Notificator.send_create_scrap_receipt(user_id, deal_id)
-        async with asyncio.TaskGroup() as tg:
-            task1 = tg.create_task(BitrixRepository.get_deal(deal_id))
-            task2 = tg.create_task(BitrixRepository.get_dmdk_lists_element_from_deal(deal_id))
-        deal, dmdks = task1.result(), task2.result()
+        Notificator.send_create_production_receipt(deal_id, user_id)
+        deal = await BitrixRepository.get_deal(deal_id)
         contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
-        # contact = await BitrixRepository.get_bitrix_contact("35732")
-        receipt_id = await create_receipt_draft(contact, deal)
+        async with asyncio.TaskGroup() as tg:
+            task1 = tg.create_task(BitrixRepository.get_dmdk_lists_element_from_deal(deal_id))
+            task2 = tg.create_task(create_receipt_draft(contact, deal))
+        dmdks, receipt_id = task1.result(), task2.result()
         Notificator.send_create_receipt_result(user_id, receipt_id)
-        await add_scrap_to_receipt(deal, receipt_id, dmdks)
-        Notificator.add_scrap_to_receipt_result(user_id, receipt_id)
+        await add_pm_to_receipt(deal, receipt_id, dmdks)
         return True
     except ServiceException as e:
         Notificator.send_message(user_id, str(e))
@@ -33,11 +31,11 @@ async def create_scrap_receipt(deal_id: str, user_id: str):
         logger.exception(str(e))
 
 
-async def create_receipt_draft(contact: ContactSchema, deal: DealSchema) -> str:
-    """Создает черновик квитанции и возвращает ее номер."""
+async def create_receipt_draft(contact, deal) -> str:
+    """Создаем черновик квитанции на изготовление ювелирных изделий."""
+    ServiceValidator.check_contact_address(contact)
     ServiceValidator.check_birthdate(contact)
-    ServiceValidator.check_passport_data(contact)
-    soap_message = get_send_buyingup_message(contact, deal)
+    soap_message = get_send_byingup_message(contact, deal)
     handler = DMDKHandler(soap_message)
     await handler.process()
     check_handler = handler.create_check_request()
@@ -50,8 +48,8 @@ async def create_receipt_draft(contact: ContactSchema, deal: DealSchema) -> str:
     return id_node.text
 
 
-def get_send_buyingup_message(contact: ContactSchema, deal: DealSchema) -> SignedXMLMessage:
-    """Собираем сообщение на создание бланка квитанции."""
+def get_send_byingup_message(contact: ContactSchema, deal: DealSchema) -> SignedXMLMessage:
+    """Собираем сообщение для отправки в DMDK."""
     ns = namespaces.NS
     ns1 = namespaces.CONTRACTOR
     ns2 = namespaces.BYINGUP
@@ -59,7 +57,7 @@ def get_send_buyingup_message(contact: ContactSchema, deal: DealSchema) -> Signe
     message = SignedXMLMessage("SendBuyingup", ns, ns1, ns2, ns3)
     receipt_node = etree.SubElement(message.request_data, f"{{{ns}}}receipt")
     type_node = etree.SubElement(receipt_node, f"{{{ns2}}}type")
-    type_node.text = "DT_RECEIPT_FOR_BUYINGUP"
+    type_node.text = "DT_RECEIPT_FOR_MANUFACTURING"
     state_node = etree.SubElement(receipt_node, f"{{{ns2}}}state")
     state_node.text = "DS_DRAFT"
     accept_date_node = etree.SubElement(receipt_node, f"{{{ns2}}}acceptDate")
@@ -76,25 +74,26 @@ def get_send_buyingup_message(contact: ContactSchema, deal: DealSchema) -> Signe
     nationality_node.text = "643"
     identity_document_node = etree.SubElement(client_node, f"{{{ns1}}}identityDocument")
     doc_type_node = etree.SubElement(identity_document_node, f"{{{ns3}}}docType")
-    doc_type_node.text = "PASSPORT"
-    serial_node = etree.SubElement(identity_document_node, f"{{{ns3}}}serial")
-    serial_node.text = contact.PASSPORT_SERIAL
-    number_node = etree.SubElement(identity_document_node, f"{{{ns3}}}number")
-    number_node.text = contact.PASSPORT_NUMBER
-    issue_date_node = etree.SubElement(identity_document_node, f"{{{ns3}}}issueDate")
-    issue_date_node.text = contact.PASSPORT_ISSUE_DATE.date().isoformat()  # type: ignore
-    issuer_node = etree.SubElement(identity_document_node, f"{{{ns3}}}issuer")
-    issuer_node.text = contact.PASSPORT_ISSUER
+    doc_type_node.text = "WITHOUT_DOCUMENT"
+    address_node = etree.SubElement(client_node, f"{{{ns1}}}address")
+    address_type_node = etree.SubElement(address_node, f"{{{ns1}}}adressType")
+    address_type_node.text = "PHYS_REGISTRATION_ADDRESS"
+    address_node = etree.SubElement(address_node, f"{{{ns1}}}address")
+    country_code_node = etree.SubElement(address_node, f"{{{ns1}}}countryCode")
+    country_code_node.text = "643"
+    outerAddress_node = etree.SubElement(address_node, f"{{{ns1}}}outerAddress")
+    outerAddress_node.text = contact.ADDRESS
     address_fact_node = etree.SubElement(client_node, f"{{{ns1}}}addressFact")
     address_fact_node.text = contact.ADDRESS
+
     # Дополнительные данные для квитанции
     description_node = etree.SubElement(receipt_node, f"{{{ns2}}}description")
     description_node.text = f"#{deal.ID} сделка в Битриксе."
     return message
 
 
-async def add_scrap_to_receipt(deal: DealSchema, receipt_id: str, dmdks: list[DMDKULSchema]):
-    """Добавление информации по лому в квитанцию."""
+async def add_pm_to_receipt(deal: DealSchema, receipt_id: str, dmdks: list[DMDKULSchema]):
+    """Добавляем драгоценные металлы в квитанцию."""
     soap_message = get_send_batch_buyingup_message(deal, receipt_id, dmdks)
     handler = DMDKHandler(soap_message)
     await handler.process()
@@ -105,9 +104,9 @@ async def add_scrap_to_receipt(deal: DealSchema, receipt_id: str, dmdks: list[DM
 def get_send_batch_buyingup_message(
     deal: DealSchema, receipt_id: str, dmdks: list[DMDKULSchema]
 ) -> SignedXMLMessage:
-    """Заполняем соап-сообщение для добавления лома в квитанцию."""
+    """Собираем сообщение для дмдк с компонентами"""
     if not dmdks:
-        raise ServiceException("Нет лома для добавления в квитанцию.")
+        raise ServiceException("Нет списочных элементов для добавления в квитанцию.")
     ns = namespaces.NS
     ns1 = namespaces.BYINGUP
     ns2 = namespaces.BATCH

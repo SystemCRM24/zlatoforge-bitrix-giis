@@ -1,3 +1,5 @@
+import json
+
 from fast_bitrix24 import BitrixAsync
 
 from src.core import settings
@@ -15,7 +17,6 @@ class BitrixRepository:
         """Получить контакт по ID"""
         contact_info: dict = await BX.call("crm.contact.get", {"id": contact_id}, raw=True)
         contact = contact_info.get("result", {})
-        # print(contact)
         return ContactSchema.model_validate(contact)
 
     @staticmethod
@@ -43,5 +44,13 @@ class BitrixRepository:
         items = {"IBLOCK_TYPE_ID": "lists", "IBLOCK_ID": "64", "FILTER": _filter}
         result = await BX.call("lists.element.get", items, raw=True)
         raw_dmdks: list = result.get("result", [])
-        # print(raw_dmdks)
         return [DMDKULSchema.model_validate(raw_dmdk) for raw_dmdk in raw_dmdks]
+
+    @staticmethod
+    async def update_dmdk_ulist_fields():
+        """Обновляет описание полей универсального списка по учету дм"""
+        items = {"IBLOCK_TYPE_ID": "lists", "IBLOCK_ID": "64"}
+        result = await BX.call("lists.field.get", items, raw=True)
+        with open("logs/dmdk_list.json", "w") as f:
+            json.dump(result.get("result", {}), f, indent=2, ensure_ascii=False)
+        # print(result)

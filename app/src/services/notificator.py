@@ -14,13 +14,9 @@ class Notificator:
     ) -> None:
         """Отправляем уведомление пользователю."""
         asyncio.create_task(BXR.send_notification(message, user_id))
-        match log:
-            case "success":
-                logger.success(message)
-            case "warning":
-                logger.warning(message)
-            case _:
-                logger.info(message)
+        method = getattr(logger, log, None)
+        if method:
+            method(message)
 
     @staticmethod
     def send_check_rfm(user_id: str | None, client: str) -> None:
@@ -41,7 +37,7 @@ class Notificator:
         Notificator.send_message(user_id, msg)
 
     @staticmethod
-    def send_create_scrap_receipt_result(user_id: str | None, receipt_id: str) -> None:
+    def send_create_receipt_result(user_id: str | None, receipt_id: str) -> None:
         """Успешное создание квитанции"""
         msg = f"Квитанция #{receipt_id} успешно создана."
         Notificator.send_message(user_id, msg, "success")
@@ -51,3 +47,9 @@ class Notificator:
         """Отправить уведомление о успехе добавления позиций в квитанцию"""
         msg = f"Позиции лома из сделки успешно добавлены в квитанцию {receipt_id}"
         Notificator.send_message(user_id, msg, "success")
+
+    @staticmethod
+    def send_create_production_receipt(user_id: str | None, deal_id: str) -> None:
+        """Отправить уведомление о создании квитанции на изготовление юи"""
+        msg = f"Осушествляется создание квитанции по сделке #{deal_id} на изготовление юи."
+        Notificator.send_message(user_id, msg)

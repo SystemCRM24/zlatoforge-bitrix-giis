@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 
 from src.schemas.bitrix import ContactSchema
 
@@ -13,7 +13,7 @@ class ServiceValidator:
     @staticmethod
     def check_birthdate(contact: ContactSchema) -> bool:
         """Проверка заполненности поля даты рождения."""
-        if not isinstance(contact.BIRTHDATE, datetime):
+        if not isinstance(contact.BIRTHDATE, date):
             msg = (
                 f"Необходимо указать дату рождения клиента {contact.LAST_NAME} {contact.NAME} для "
                 "осуществления проверки в реестрах Росфинмониторинга"
@@ -38,3 +38,10 @@ class ServiceValidator:
             )
             raise ServiceException(msg)
         return result
+
+    @staticmethod
+    def check_contact_address(contact: ContactSchema) -> bool:
+        """Проверка заполненности адреса."""
+        if not contact.ADDRESS:
+            raise ServiceException("Для создания квитанции необходимо заполнить адрес клиента.")
+        return True
