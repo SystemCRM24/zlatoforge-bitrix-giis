@@ -21,6 +21,7 @@ app = FastAPI(
     title="Cypher",
     summary=f"Приложение сконфигурировано под контур: {contour}.",
     description=description,
+    root_path='/zlatoforge/'
 )
 app.add_middleware(
     CORSMiddleware,
