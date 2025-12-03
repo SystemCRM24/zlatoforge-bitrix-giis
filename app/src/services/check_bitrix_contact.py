@@ -18,7 +18,7 @@ async def check_bitrix_contact(contact_id: str, user_id: str | None) -> bool | N
         ServiceValidator.check_birthdate(contact)
         ServiceValidator.check_passport_data(contact)
         soap_message = get_send_get_personal_verify_rfm_message(contact)
-        handler = DMDKHandler(soap_message)
+        handler = DMDKHandler(soap_message, contour="work")
         await handler.process()
         check_handler = handler.create_check_request()
         await check_handler.process(True)
@@ -46,7 +46,7 @@ def get_send_get_personal_verify_rfm_message(contact: ContactSchema) -> SignedXM
     first_name_node = etree.SubElement(preson_node, f"{{{ns1}}}firstName")
     first_name_node.text = contact.NAME
     birth_day_node = etree.SubElement(preson_node, f"{{{ns1}}}birthDay")
-    birth_day_node.text = contact.BIRTHDATE.date().isoformat()  # type:ignore
+    birth_day_node.text = contact.BIRTHDATE.isoformat()  # type:ignore
     identity_document_node = etree.SubElement(preson_node, f"{{{ns1}}}identityDocument")
     doc_type_node = etree.SubElement(identity_document_node, f"{{{ns2}}}docType")
     doc_type_node.text = "PASSPORT"
@@ -55,7 +55,7 @@ def get_send_get_personal_verify_rfm_message(contact: ContactSchema) -> SignedXM
     number_node = etree.SubElement(identity_document_node, f"{{{ns2}}}number")
     number_node.text = contact.PASSPORT_NUMBER
     issue_date_node = etree.SubElement(identity_document_node, f"{{{ns2}}}issueDate")
-    issue_date_node.text = contact.PASSPORT_ISSUE_DATE.date().isoformat()  # type:ignore
+    issue_date_node.text = contact.PASSPORT_ISSUE_DATE.isoformat()  # type:ignore
     issuer_node = etree.SubElement(identity_document_node, f"{{{ns2}}}issuer")
     issuer_node.text = contact.PASSPORT_ISSUER
     return message

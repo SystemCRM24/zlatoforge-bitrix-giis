@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src._examples import router as test_router
 from src.api import router as api_router
+from src.core import settings
 from src.services import on_startup
 
 
@@ -14,8 +15,12 @@ description = """Предоставляет методы для отправки
 4) Ряд утилитарных методов для работы с подписями, шифрованием и тп.
 """
 
+contour = "Рабочий" if settings.MODE == "prod" else "Тестовый"
+
 app = FastAPI(
-    title="Cypher", summary="Интерфейс для отправки SOAP-запросов в ГИИС.", description=description
+    title="Cypher",
+    summary=f"Приложение сконфигурировано под контур: {contour}.",
+    description=description,
 )
 app.add_middleware(
     CORSMiddleware,

@@ -2,12 +2,14 @@ from fastapi import APIRouter
 
 from .clients import router as clients_router
 from .examples import router as examples_router
+from .health import router as health_router
 from .receipt import router as receipt_router
 
 
 api_router = APIRouter(prefix="/api", tags=["api"])
 api_router.include_router(clients_router)
 api_router.include_router(receipt_router)
+api_router.include_router(health_router)
 
 
 router = APIRouter(prefix="")

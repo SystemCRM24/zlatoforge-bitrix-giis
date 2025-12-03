@@ -4,14 +4,19 @@ from pathlib import Path
 import requests
 from lxml import etree  # type:ignore
 
+from src.api.health import _do_health_request
 from src.core import settings
 from src.utils import logger
 
 
-def on_startup():
+async def on_startup():
     """Нужно подтянуть файлик exchange со стороны ГИИС."""
     check_exchange_file("test", settings._giis_test_contour)
     check_exchange_file("work", settings._giis_work_contour)
+    work_contour = await _do_health_request("work")
+    logger.info(f"Work countour status: {work_contour}")
+    test_contour = await _do_health_request("test")
+    logger.info(f"Test countour status: {test_contour}")
 
 
 def check_exchange_file(contour: str, address: str):

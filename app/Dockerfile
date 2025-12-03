@@ -101,6 +101,6 @@ COPY ./pyproject.toml ./uv.lock ./
 RUN pip install --no-cache-dir uv && uv pip install --system --no-cache-dir .
 COPY ./main.py ./
 
-#COPY cypher/src ./src
+COPY /src ./src
 
 EXPOSE 8000 1500

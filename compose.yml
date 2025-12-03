@@ -14,7 +14,7 @@ services:
       - "${APP_PORT}:8000"
     volumes:
       - ./app/logs:/app/logs
-      - ./app/src:/app/src
+      # - ./app/src:/app/src
     build:
       context: ./app
     command: ["/start.sh"]

@@ -17,7 +17,7 @@ class ContactSchema(BaseModel):
     PASSPORT_SERIAL: str = Field(alias="UF_CRM_1648298974485", default="")
     PASSPORT_NUMBER: str = Field(alias="UF_CRM_1648298987071", default="")
     PASSPORT_ISSUER: str = Field(alias="UF_CRM_1648299575558", default="")
-    PASSPORT_ISSUE_DATE: datetime | None = Field(alias="UF_CRM_1648299623368", default=None)
+    PASSPORT_ISSUE_DATE: date | None = Field(alias="UF_CRM_1648299623368", default=None)
 
     @field_validator("BIRTHDATE", "PASSPORT_ISSUE_DATE", mode="before")
     @classmethod

@@ -82,7 +82,7 @@ def get_send_buyingup_message(contact: ContactSchema, deal: DealSchema) -> Signe
     number_node = etree.SubElement(identity_document_node, f"{{{ns3}}}number")
     number_node.text = contact.PASSPORT_NUMBER
     issue_date_node = etree.SubElement(identity_document_node, f"{{{ns3}}}issueDate")
-    issue_date_node.text = contact.PASSPORT_ISSUE_DATE.date().isoformat()  # type: ignore
+    issue_date_node.text = contact.PASSPORT_ISSUE_DATE.isoformat()  # type: ignore
     issuer_node = etree.SubElement(identity_document_node, f"{{{ns3}}}issuer")
     issuer_node.text = contact.PASSPORT_ISSUER
     address_fact_node = etree.SubElement(client_node, f"{{{ns1}}}addressFact")
