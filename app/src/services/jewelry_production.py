@@ -88,6 +88,8 @@ def get_send_byingup_message(contact: ContactSchema, deal: DealSchema) -> Signed
     address_fact_node.text = contact.ADDRESS
 
     # Дополнительные данные для квитанции
+    doc_number_node = etree.SubElement(receipt_node, f"{{{ns2}}}docNumber")
+    doc_number_node.text = str(deal.ID)
     description_node = etree.SubElement(receipt_node, f"{{{ns2}}}description")
     description_node.text = f"#{deal.ID} сделка в Битриксе."
     return message
