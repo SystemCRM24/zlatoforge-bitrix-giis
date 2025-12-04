@@ -2,7 +2,7 @@ import asyncio
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from lxml import etree  # type:ignore
 from zeep import AsyncClient
@@ -34,15 +34,13 @@ class DMDKHandler:
             self.__class__.TEST_CLIENT = AsyncClient("./logs/test-exchange3.wsdl")
         if self.__class__.WORK_CLIENT is None:
             self.__class__.WORK_CLIENT = AsyncClient("./logs/work-exchange3.wsdl")
-        if self.contour == "work" or settings.MODE == "prod":
+        if self.contour == "work":
             logger.debug("DMDKHandler uses Work contour.")
             return self.__class__.WORK_CLIENT
         logger.debug("DMDKHandler uses Test contour.")
         return self.__class__.TEST_CLIENT
 
-    def __init__(
-        self, message: SignedXMLMessage, contour: Literal["test", "work", "app"] = "app", log=False
-    ):
+    def __init__(self, message: SignedXMLMessage, contour: str, log=False):
         """
         contour - контур, который будет учавствовать в запросах.
         Если явно не определн test или work - выбирается в зависимости от режима прилоожения.
@@ -55,9 +53,10 @@ class DMDKHandler:
 
     def _setup_post_request(self, message: str) -> dict:
         """Возвращает настройки для соап-запроса"""
-        address = settings._giis_test_contour
-        if self.contour == "work" or settings.MODE == "prod":
+        if self.contour == "work":
             address = settings._giis_work_contour
+        else:
+            address = settings._giis_test_contour
         return {"address": address, "message": message, "headers": self.DMDK_HEADERS}
 
     async def process(self, await_check_result=False) -> Any:
@@ -161,8 +160,7 @@ class DMDKHandler:
         check_message = SignedXMLMessage(endpoint, NS)
         message_id_node = etree.SubElement(check_message.request_data, f"{{{NS}}}messageId")
         message_id_node.text = message_id
-        handler = DMDKHandler(check_message)
-        handler.contour = self.contour
+        handler = DMDKHandler(check_message, self.contour)
         handler.log = self.log
         handler._requested_at = self._requested_at
         return handler

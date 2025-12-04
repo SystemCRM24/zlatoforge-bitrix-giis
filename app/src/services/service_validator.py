@@ -1,6 +1,6 @@
 from datetime import date
 
-from src.schemas.bitrix import ContactSchema
+from src.schemas.bitrix import ContactSchema, DMDKULSchema
 
 
 class ServiceException(Exception):
@@ -45,3 +45,13 @@ class ServiceValidator:
         if not contact.ADDRESS:
             raise ServiceException("Для создания квитанции необходимо заполнить адрес клиента.")
         return True
+
+    @staticmethod
+    def check_dmdkul_element(dmdkuls: list[DMDKULSchema]) -> bool:
+        """Проверяем списочные элементы на присутствие в них галочки: Интеграция с ГИИС"""
+        for el in dmdkuls:
+            if el.IS_GIIS_INTEGRATION:
+                return True
+        raise ServiceException(
+            'В списочных элементах не найдено ни одного с пометкой "Интеграция с ГИИС"'
+        )

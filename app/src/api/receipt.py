@@ -2,27 +2,27 @@ import asyncio
 
 from fastapi import APIRouter, Query
 
-from src.services.create_scrap_receipt import create_scrap_receipt as _create_scrap_receipt
-from src.services.jewelry_production import create_production_receipt as _create_production_receipt
+from src.schemas.queries import ReceiptQuerySchema
+from src.services.jewelry_manufacturing import (
+    create_production_receipt as _create_production_receipt,
+)
+from src.services.scrap_receipt import create_scrap_receipt as _create_scrap_receipt
 
 
 router = APIRouter(prefix="")
 
 
-UserIdQuery = Query(default="7780", description="Пользователь по умолчанию Админ Мега")
-
-
 @router.post("/create_scrap_receipt", status_code=201)
-async def create_scrap_receipt(deal_id: str = Query(), user_id: str = UserIdQuery) -> str:
+async def create_scrap_receipt(q: ReceiptQuerySchema = Query()) -> str:
     """Создание квитанции на скупку лома на основе данных битрикса клиента."""
-    coro = _create_scrap_receipt(deal_id, user_id)
+    coro = _create_scrap_receipt(q.deal_id, q.user_id, q.contour)
     asyncio.create_task(coro)
     return "Task created"
 
 
 @router.post("/create_manufacturing_receipt", status_code=201)
-async def create_production_receipt(deal_id: str = Query(), user_id: str = UserIdQuery) -> str:
+async def create_production_receipt(q: ReceiptQuerySchema = Query()) -> str:
     """Создание квитанции на изготовление ювелирного изделия."""
-    coro = _create_production_receipt(deal_id, user_id)
+    coro = _create_production_receipt(q.deal_id, q.user_id, q.contour)
     asyncio.create_task(coro)
     return "Task created"

@@ -56,5 +56,6 @@ class Notificator:
 
     @staticmethod
     def send_create_production_receipt_result(user_id: str | None, receipt_id: str) -> None:
+        """Рапортуем об успешном создании квитанции на изготовление."""
         msg = f"Позиции ДМ успешно добавлены в квитанцию #{receipt_id}."
         Notificator.send_message(user_id, msg)

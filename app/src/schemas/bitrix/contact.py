@@ -11,6 +11,7 @@ class ContactSchema(BaseModel):
     ID: str
     NAME: str
     LAST_NAME: str
+    SECOND_NAME: str = Field(default="")
     BIRTHDATE: date | None = None
     ADDRESS: str = Field(alias="UF_CRM_1591111034541", default="")
     # Паспортные данные

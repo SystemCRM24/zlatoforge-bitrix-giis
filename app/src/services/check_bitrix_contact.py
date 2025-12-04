@@ -9,7 +9,7 @@ from .notificator import Notificator
 from .service_validator import ServiceException, ServiceValidator
 
 
-async def check_bitrix_contact(contact_id: str, user_id: str | None) -> bool | None:
+async def check_bitrix_contact(contact_id: str, user_id: str) -> bool | None:
     """Проверяет контакт в битрикс24 и отправляет уведомление пользователю."""
     try:
         contact = await BitrixRepository.get_bitrix_contact(contact_id)
