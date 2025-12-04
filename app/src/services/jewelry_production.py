@@ -14,7 +14,7 @@ from .service_validator import ServiceException, ServiceValidator
 async def create_production_receipt(deal_id: str, user_id: str):
     """Создание квитанции на изготовление ювелирных изделий."""
     try:
-        Notificator.send_create_production_receipt(deal_id, user_id)
+        Notificator.send_create_production_receipt(user_id, deal_id)
         deal = await BitrixRepository.get_deal(deal_id)
         contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
         async with asyncio.TaskGroup() as tg:
@@ -23,6 +23,7 @@ async def create_production_receipt(deal_id: str, user_id: str):
         dmdks, receipt_id = task1.result(), task2.result()
         Notificator.send_create_receipt_result(user_id, receipt_id)
         await add_pm_to_receipt(deal, receipt_id, dmdks)
+        Notificator.send_create_production_receipt_result(user_id, receipt_id)
         return True
     except ServiceException as e:
         Notificator.send_message(user_id, str(e))
