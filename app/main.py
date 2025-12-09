@@ -14,11 +14,7 @@ description = """Предоставляет методы для отправки
 4) Ряд утилитарных методов для работы с подписями, шифрованием и тп.
 """
 
-app = FastAPI(
-    title="Cypher",
-    description=description,
-    root_path='/zlatoforge/'
-)
+app = FastAPI(title="Cypher", description=description, root_path="/zlatoforge/")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

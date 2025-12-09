@@ -27,6 +27,20 @@ class ReceiptQuerySchema(QuerySchema):
     deal_id: str = Field(description="Идентификатор сделки в Битриксе.")
 
 
+class ScrapReceiptQuerySchema(ReceiptQuerySchema):
+    """Схема для валидации query параметоров для запроса создания квитанции на скупку лома."""
+
+    is_empty_receipt: bool = Field(description="Флаг на создание пустой квитанции", default=False)
+
+    @field_validator("is_empty_receipt", mode="before")
+    @classmethod
+    def validate_is_empty_receipt(cls, value) -> bool:
+        """Приводим значние параметра из битрикса"""
+        if value == "Да" or value is True:
+            return True
+        return False
+
+
 class ContactQuerySchema(QuerySchema):
     """Схема для валидации query параметров для проверки контактов."""
 

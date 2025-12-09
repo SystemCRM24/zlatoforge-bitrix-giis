@@ -5,38 +5,57 @@ from lxml import etree  # type:ignore
 from src.bitrix import BitrixRepository
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
 from src.schemas.bitrix import ContactSchema, DealSchema, DMDKULSchema
+from src.schemas.queries import ScrapReceiptQuerySchema
 from src.utils import logger
 
 from .notificator import Notificator
 from .service_validator import ServiceException, ServiceValidator
 
 
-async def create_scrap_receipt(deal_id: str, user_id: str, contour: str):
+async def create_scrap_receipt(q: ScrapReceiptQuerySchema):
     """Формирование квитанции на скупку лома"""
     try:
-        Notificator.send_create_scrap_receipt(user_id, deal_id)
-        async with asyncio.TaskGroup() as tg:
-            task1 = tg.create_task(BitrixRepository.get_deal(deal_id))
-            task2 = tg.create_task(BitrixRepository.get_dmdk_lists_element_from_deal(deal_id))
-        deal, dmdks = task1.result(), task2.result()
-        ServiceValidator.check_dmdkul_element(dmdks)
-        contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
-        receipt_id = await create_receipt_draft(contact, deal, contour)
-        Notificator.send_create_receipt_result(user_id, receipt_id)
-        await add_scrap_to_receipt(deal, receipt_id, dmdks, contour)
-        Notificator.add_scrap_to_receipt_result(user_id, receipt_id)
-        return True
+        if q.is_empty_receipt:
+            return await create_empty_receipt(q)
+        else:
+            return await create_nonempty_receipt(q)
     except ServiceException as e:
-        Notificator.send_message(user_id, str(e))
+        Notificator.send_message(q.user_id, str(e))
     except Exception as e:
-        Notificator.send_message(user_id, f"Внутренняя ошибка сервиса: {e}")
+        Notificator.send_message(q.user_id, f"Внутренняя ошибка сервиса: {e}")
         logger.exception(str(e))
+
+
+async def create_empty_receipt(q: ScrapReceiptQuerySchema):
+    """Создание пустой квитанции"""
+    Notificator.send_create_scrap_receipt(q.user_id, q.deal_id)
+    deal = await BitrixRepository.get_deal(q.deal_id)
+    contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
+    receipt_id = await create_receipt_draft(contact, deal, q.contour)
+    Notificator.send_create_receipt_result(q.user_id, receipt_id)
+    return True
+
+
+async def create_nonempty_receipt(q: ScrapReceiptQuerySchema):
+    """Создание непустой квитанции"""
+    Notificator.send_create_scrap_receipt(q.user_id, q.deal_id)
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(BitrixRepository.get_deal(q.deal_id))
+        task2 = tg.create_task(BitrixRepository.get_dmdk_lists_element_from_deal(q.deal_id))
+    deal, dmdks = task1.result(), task2.result()
+    ServiceValidator.check_dmdkul_element(dmdks)
+    contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
+    receipt_id = await create_receipt_draft(contact, deal, q.contour)
+    Notificator.send_create_receipt_result(q.user_id, receipt_id)
+    await add_scrap_to_receipt(deal, receipt_id, dmdks, q.contour)
+    Notificator.add_scrap_to_receipt_result(q.user_id, receipt_id)
+    return True
 
 
 async def create_receipt_draft(contact: ContactSchema, deal: DealSchema, contour: str) -> str:
     """Создает черновик квитанции и возвращает ее номер."""
     ServiceValidator.check_birthdate(contact)
-    ServiceValidator.check_passport_data(contact)
+    ServiceValidator.check_passport_data(contact, "scrap")
     soap_message = get_send_buyingup_message(contact, deal)
     handler = DMDKHandler(soap_message, contour)
     await handler.process()

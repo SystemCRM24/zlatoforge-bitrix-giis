@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 from src.schemas.bitrix import ContactSchema, DMDKULSchema
 
@@ -22,7 +23,7 @@ class ServiceValidator:
         return True
 
     @staticmethod
-    def check_passport_data(contact: ContactSchema) -> bool:
+    def check_passport_data(contact: ContactSchema, reason: Literal["check", "scrap"]) -> bool:
         """Проверка заполнненности паспортных данных."""
         result = all((
             contact.PASSPORT_SERIAL,
@@ -31,10 +32,13 @@ class ServiceValidator:
             contact.PASSPORT_ISSUE_DATE,
         ))
         if not result:
+            if reason == "scrap":
+                pre = "Для создания квитанциии на скупку "
+            else:
+                pre = "Для проверки в реестрах Росфинмониторинга "
             msg = (
-                f"Необходимо заполнить все паспортные данные клиента {contact.LAST_NAME} "
-                f"{contact.NAME}: серия и номер паспорта, кем выдан и дата выдачи, "
-                "для осуществления проверки в реестрах Росфинмониторинга"
+                f"{pre} необходимо заполнить все паспортные данные клиента {contact.LAST_NAME} "
+                f"{contact.NAME}: серия и номер паспорта, кем выдан и дата выдачи."
             )
             raise ServiceException(msg)
         return result

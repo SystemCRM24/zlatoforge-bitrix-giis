@@ -16,7 +16,7 @@ async def check_bitrix_contact(contact_id: str, user_id: str) -> bool | None:
         client = f"{contact.LAST_NAME} {contact.NAME}"
         Notificator.send_check_rfm(user_id, client)
         ServiceValidator.check_birthdate(contact)
-        ServiceValidator.check_passport_data(contact)
+        ServiceValidator.check_passport_data(contact, "check")
         soap_message = get_send_get_personal_verify_rfm_message(contact)
         handler = DMDKHandler(soap_message, contour="work")
         await handler.process()

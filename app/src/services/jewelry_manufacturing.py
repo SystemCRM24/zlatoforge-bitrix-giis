@@ -131,6 +131,8 @@ def get_send_batch_buyingup_message(
     replace_node = etree.SubElement(receipt_node, f"{{{ns1}}}replace")
     replace_node.text = "false"
     for index, scrap in enumerate(dmdks, start=1):
+        if not scrap.IS_GIIS_INTEGRATION:
+            continue
         batch_list_node = etree.SubElement(receipt_node, f"{{{ns1}}}batchList")
         # Данные по лому
         index_node = etree.SubElement(batch_list_node, f"{{{ns2}}}index")
