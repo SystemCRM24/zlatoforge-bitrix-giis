@@ -5,32 +5,49 @@ from lxml import etree  # type:ignore
 from src.bitrix import BitrixRepository
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
 from src.schemas.bitrix import ContactSchema, DealSchema, DMDKULSchema
+from src.schemas.queries import ManufacturingReceiptQuerySchema
 from src.utils import logger
 
 from .notificator import Notificator
 from .service_validator import ServiceException, ServiceValidator
 
 
-async def create_production_receipt(deal_id: str, user_id: str, contour: str):
+async def create_production_receipt(q: ManufacturingReceiptQuerySchema):
     """Создание квитанции на изготовление ювелирных изделий."""
     try:
-        Notificator.send_create_production_receipt(user_id, deal_id)
-        async with asyncio.TaskGroup() as tg:
-            t1 = tg.create_task(BitrixRepository.get_deal(deal_id))
-            t2 = tg.create_task(BitrixRepository.get_dmdk_lists_element_from_deal(deal_id))
-        deal, dmdks = t1.result(), t2.result()
-        ServiceValidator.check_dmdkul_element(dmdks)
-        contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
-        receipt_id = await create_receipt_draft(contact, deal, contour)
-        Notificator.send_create_receipt_result(user_id, receipt_id)
-        await add_pm_to_receipt(deal, receipt_id, dmdks, contour)
-        Notificator.send_create_production_receipt_result(user_id, receipt_id)
-        return True
+        coro = create_empty_receipt if q.is_empty_receipt else create_nonempty_receipt
+        return await coro(q)
     except ServiceException as e:
-        Notificator.send_message(user_id, str(e))
+        Notificator.send_message(q.user_id, str(e))
     except Exception as e:
-        Notificator.send_message(user_id, f"Внутренняя ошибка сервиса: {e}")
+        Notificator.send_message(q.user_id, f"Внутренняя ошибка сервиса: {e}")
         logger.exception(str(e))
+
+
+async def create_empty_receipt(q: ManufacturingReceiptQuerySchema):
+    """Создание пустой квитанции"""
+    Notificator.send_create_production_receipt(q.user_id, q.deal_id)
+    deal = await BitrixRepository.get_deal(q.deal_id)
+    contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
+    receipt_id = await create_receipt_draft(contact, deal, q.contour)
+    Notificator.send_create_receipt_result(q.user_id, receipt_id)
+    return True
+
+
+async def create_nonempty_receipt(q: ManufacturingReceiptQuerySchema):
+    """Создание квитанции с прикрепленной партией"""
+    Notificator.send_create_production_receipt(q.user_id, q.deal_id)
+    async with asyncio.TaskGroup() as tg:
+        t1 = tg.create_task(BitrixRepository.get_deal(q.deal_id))
+        t2 = tg.create_task(BitrixRepository.get_dmdk_lists_element_from_deal(q.deal_id))
+    deal, dmdks = t1.result(), t2.result()
+    ServiceValidator.check_dmdkul_element(dmdks)
+    contact = await BitrixRepository.get_bitrix_contact(deal.CONTACT_ID)
+    receipt_id = await create_receipt_draft(contact, deal, q.contour)
+    Notificator.send_create_receipt_result(q.user_id, receipt_id)
+    await add_pm_to_receipt(deal, receipt_id, dmdks, q.contour)
+    Notificator.send_create_production_receipt_result(q.user_id, receipt_id)
+    return True
 
 
 async def create_receipt_draft(contact, deal, contour) -> str:
