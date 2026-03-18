@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, computed_field
 
 
 class ContactSchema(BaseModel):
@@ -16,7 +16,8 @@ class ContactSchema(BaseModel):
     ADDRESS: str = Field(alias="UF_CRM_1591111034541", default="")
     # Паспортные данные
     PASSPORT_SERIAL: str = Field(alias="UF_CRM_1648298974485", default="")
-    PASSPORT_NUMBER: str = Field(alias="UF_CRM_1648298987071", default="")
+    PASSPORT_NUMBER_OLD: str = Field(alias="UF_CRM_1648298987071", default="")
+    PASSPORT_NUMBER_NEW: str = Field(alias="UF_CRM_1773043830", default="")
     PASSPORT_ISSUER: str = Field(alias="UF_CRM_1648299575558", default="")
     PASSPORT_ISSUE_DATE: date | None = Field(alias="UF_CRM_1648299623368", default=None)
 
@@ -34,3 +35,13 @@ class ContactSchema(BaseModel):
         pattern = "|;"
         result = address.split(pattern)[0]
         return result
+    
+    @computed_field
+    @property
+    def PASSPORT_NUMBER(self) -> str:
+        if len(self.PASSPORT_NUMBER_NEW) == 6:
+            return self.PASSPORT_NUMBER_NEW
+        old = self.PASSPORT_NUMBER_OLD
+        if len(old) < 6:
+            old = f'0{old}'
+        return old
