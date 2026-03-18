@@ -39,9 +39,10 @@ class ContactSchema(BaseModel):
     @computed_field
     @property
     def PASSPORT_NUMBER(self) -> str:
-        if len(self.PASSPORT_NUMBER_NEW) == 6:
-            return self.PASSPORT_NUMBER_NEW
-        old = self.PASSPORT_NUMBER_OLD
+        number = self.PASSPORT_NUMBER_NEW.strip()
+        if len(number) == 6:
+            return number
+        number = self.PASSPORT_NUMBER_OLD.strip()
         if len(old) < 6:
             old = f'0{old}'
         return old
