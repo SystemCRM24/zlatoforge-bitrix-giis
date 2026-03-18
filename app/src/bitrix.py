@@ -29,11 +29,11 @@ class BitrixRepository:
     @staticmethod
     async def send_notification(message: str, user_id: str | None = None):
         """Отправляет уведомление пользователю"""
-        if user_id is None:
-            user_id = settings.DEFAULT_USER
         # user_id может прийти в таком формате, поэтому надо его преобразовать
-        if user_id.startswith("user"):
+        if isinstance(user_id, str) and user_id.startswith("user"):
             user_id = user_id[5:]
+        if not user_id:
+            user_id = settings.DEFAULT_USER
         items = {"USER_ID": user_id, "MESSAGE": message}
         return await BX.call("im.notify.personal.add", items)
 

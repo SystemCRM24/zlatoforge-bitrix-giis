@@ -21,6 +21,13 @@ class ContactSchema(BaseModel):
     PASSPORT_ISSUER: str = Field(alias="UF_CRM_1648299575558", default="")
     PASSPORT_ISSUE_DATE: date | None = Field(alias="UF_CRM_1648299623368", default=None)
 
+    @field_validator("SECOND_NAME", mode="before")
+    @classmethod
+    def validate_none(cls, value: str | None) -> str:
+        if value is None:
+            return ""
+        return value
+
     @field_validator("BIRTHDATE", "PASSPORT_ISSUE_DATE", mode="before")
     @classmethod
     def validate_date(cls, birth_date: str) -> date | None:
