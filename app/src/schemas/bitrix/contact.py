@@ -49,7 +49,7 @@ class ContactSchema(BaseModel):
         number = self.PASSPORT_NUMBER_NEW.strip()
         if len(number) == 6:
             return number
-        number = self.PASSPORT_NUMBER_OLD.strip()
+        old = self.PASSPORT_NUMBER_OLD.strip()
         if len(old) < 6:
-            old = f'0{old}'
+            old = old.zfill(6)
         return old
