@@ -5,14 +5,19 @@ sys.path.insert(0, '/app')
 
 from lxml import etree
 from giis_integration_core.webhook_handler.bitrix_client import BitrixClient
+from giis_integration_core.webhook_handler.notifications import notify_success, notify_error
 from src.dmdk_handler import DMDKHandler, SignedXMLMessage, namespaces
 
 bitrix = BitrixClient()
 
 async def process_buyingup(deal_id: int):
-    print(f" Начало обработки скупки для Сделки Битрикс24 ID: {deal_id}")
+    """
+    Основной обработчик для создания квитанции на скупку на основе Сделки и Контакта.
+    """
+    print(f"🚀 Начало обработки скупки для Сделки Битрикс24 ID: {deal_id}")
     
     try:
+        # 1. Забираем данные Сделки и Контакта
         print("📥 Загрузка данных из Битрикс24...")
         deal_fields = await bitrix.get_deal(deal_id)
         contact_id = deal_fields.get('CONTACT_ID')
@@ -22,6 +27,7 @@ async def process_buyingup(deal_id: int):
             print(f"📥 Загрузка данных Контакта ID: {contact_id}...")
             contact_fields = await bitrix.get_contact(contact_id)
 
+        # 2. Извлекаем реальные данные (приоритет: Контакт -> Сделка -> заглушка)
         last_name = contact_fields.get('LAST_NAME') or deal_fields.get('UF_CRM_GIIS_CLIENT_LAST_NAME') or "Петров"
         first_name = contact_fields.get('NAME') or deal_fields.get('UF_CRM_GIIS_CLIENT_FIRST_NAME') or "Петр"
         second_name = contact_fields.get('SECOND_NAME') or deal_fields.get('UF_CRM_GIIS_CLIENT_SECOND_NAME') or "Петрович"
@@ -38,6 +44,8 @@ async def process_buyingup(deal_id: int):
             issue_date = str(issue_date).split('T')[0]
             
         issuer = contact_fields.get('UF_CRM_1648299575558') or deal_fields.get('UF_CRM_GIIS_CLIENT_PASSPORT_ISSUER') or "ОВД г. Кирова"
+        
+        # Адрес (берем из правильного пользовательского поля Контакта)
         address = contact_fields.get('UF_CRM_1591111034541') or contact_fields.get('ADDRESS') or deal_fields.get('UF_CRM_GIIS_CLIENT_ADDRESS') or "г. Киров, ул. Тестовая, д. 1"
         address = address.split('|;|')[0].strip() if '|;|' in address else address
 
@@ -45,6 +53,7 @@ async def process_buyingup(deal_id: int):
         print(f"   Паспорт: {passport_serial} {passport_number}, выдан {issue_date}")
         print(f"   Адрес: {address}")
 
+        # 3. Формируем XML сообщение (СТРОГО в порядке XSD схемы ГИИС)
         ns = namespaces.NS
         ns_contractor = namespaces.CONTRACTOR
         ns_buyingup = namespaces.BYINGUP
@@ -76,7 +85,8 @@ async def process_buyingup(deal_id: int):
         etree.SubElement(client_node, f"{{{ns_contractor}}}addressFact").text = address
         etree.SubElement(receipt_node, f"{{{ns_buyingup}}}description").text = f"Сделка #{deal_id} в Битриксе."
 
-        print("✍️ Подписываем и отправляем сообщение в ГИИС ДМДК...")
+        # 4. Отправляем в ГИИС ДМДК
+        print("✍️ Подписываем и отправляем сообщение в ГИИС ДМДК (тестовый контур)...")
         handler = DMDKHandler(message, contour="test")
         await handler.process()
         
@@ -84,17 +94,26 @@ async def process_buyingup(deal_id: int):
         check_handler = handler.create_check_request()
         await check_handler.process(True)
         
+        # 5. Извлекаем ID квитанции из ответа
         result_node = check_handler.response.find(f".//{{{ns}}}result")
         if result_node is not None:
             id_node = result_node.find(f".//{{{ns}}}id")
             if id_node is not None and id_node.text:
                 receipt_id = id_node.text
                 print(f"🎉 Успех! Квитанция {receipt_id} создана.")
+                
+                # ВАЖНО: вызываем асинхронную функцию с await
+                await notify_success(deal_id, receipt_id, "Скупка")
+                
                 return receipt_id
         
-        print("❌ Квитанция не создана")
+        error_msg = "Квитанция не создана: не удалось получить ID из ответа ГИИС"
+        print(f"❌ {error_msg}")
+        await notify_error(deal_id, error_msg, "Скупка")
         return None
 
     except Exception as e:
-        print(f"❌ Критическая ошибка: {str(e)}")
+        error_msg = str(e)
+        print(f"❌ Критическая ошибка обработки: {error_msg}")
+        await notify_error(deal_id, error_msg, "Скупка")
         return None
