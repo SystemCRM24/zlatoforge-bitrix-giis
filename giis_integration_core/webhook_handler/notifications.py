@@ -14,7 +14,6 @@ async def notify_success(deal_id: int, receipt_id: str, service_type: str):
     url = f"{B24_WEBHOOK_URL}crm.deal.update.json"
     now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     
-    # ВАЖНО: добавляем "id": deal_id в payload
     payload = {
         "id": deal_id,
         "fields": {
@@ -40,12 +39,11 @@ async def notify_success(deal_id: int, receipt_id: str, service_type: str):
 async def notify_error(deal_id: int, error_msg: str, service_type: str):
     """Асинхронно записывает ошибку в сделку Битрикс24"""
     if not B24_WEBHOOK_URL:
-        print("️ BITRIX_WEBHOOK не задан в .env, обновление пропущено")
+        print("⚠️ BITRIX_WEBHOOK не задан в .env, обновление пропущено")
         return
         
     url = f"{B24_WEBHOOK_URL}crm.deal.update.json"
     
-    # ВАЖНО: добавляем "id": deal_id в payload
     payload = {
         "id": deal_id,
         "fields": {
@@ -67,15 +65,17 @@ async def add_comment(deal_id: int, message: str):
         url = f"{B24_WEBHOOK_URL}crm.timeline.comment.add.json"
         payload = {
             "fields": {
+                "ENTITY_TYPE": "deal",
                 "ENTITY_ID": deal_id,
                 "COMMENT": message
             }
         }
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, timeout=10.0)
-            if response.json().get("result"):
+            res_json = response.json()
+            if res_json.get("result"):
                 print(f"💬 Комментарий успешно добавлен в ленту сделки {deal_id}.")
             else:
-                print(f"️ Не удалось добавить комментарий: {response.json().get('error_description')}")
+                print(f"⚠️ Не удалось добавить комментарий: {res_json.get('error_description')}")
     except Exception as e:
-        print(f"⚠️ Исключение при добавлении комментария: {e}")
+        print(f"️ Исключение при добавлении комментария: {e}")

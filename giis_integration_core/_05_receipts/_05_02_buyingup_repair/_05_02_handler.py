@@ -1,3 +1,4 @@
+import traceback
 import sys
 from datetime import date
 
@@ -114,6 +115,7 @@ async def process_buyingup(deal_id: int):
 
     except Exception as e:
         error_msg = str(e)
+        print(f"🚨 ТИП ОШИБКИ: {type(e).__name__}\n{traceback.format_exc()}")
         print(f"❌ Критическая ошибка обработки: {error_msg}")
         await notify_error(deal_id, error_msg, "Скупка")
         return None
